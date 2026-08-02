@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Activities — Loopline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="12" stroke="#2C5F63" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="#3F8489" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline
+    </a>
+    <div class="nav-links">
+      <a href="index.html#about">About Us</a>
+      <a href="index.html#contact">Contact Us</a>
+      <a href="activities.html" style="color:var(--teal-dark); font-weight:600;">Activities</a>
+      <a href="index.html#survey">Survey</a>
+      <a href="index.html#chat">AI Chat</a>
+    </div>
+    <div class="nav-auth">
+      <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+      <a href="signup.html" class="btn btn-primary btn-sm">Sign up</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<main class="activities-wrap">
+  <div class="container">
+
+    <!-- ============ Page Header ============ -->
+    <div class="activities-header">
+      <span class="eyebrow">Customer account</span>
+      <h1>My Complaint Activities</h1>
+      <p style="margin-bottom:0;">Track every complaint you've submitted, check the status, and file new ones.</p>
+    </div>
+
+    <!-- ============ Profile + Summary Cards Row ============ -->
+    <div class="profile-row">
+
+      <!-- Profile Card -->
+      <aside class="card profile-card">
+        <div class="profile-avatar" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="24" fill="#E4F0F0"/>
+            <circle cx="24" cy="19" r="7" fill="#3F8489"/>
+            <path d="M10 41C10 33.3 16.3 27 24 27C31.7 27 38 33.3 38 41" fill="#3F8489"/>
+          </svg>
+        </div>
+        <h2 class="profile-name">Yiyi</h2>
+        <div class="profile-role">Customer</div>
+        <div class="profile-info">
+          <div class="profile-info-row">
+            <span class="profile-info-label">Email</span>
+            <span class="profile-info-value" id="profile-email">yiyi@example.com</span>
+          </div>
+          <div class="profile-info-row">
+            <span class="profile-info-label">Joined</span>
+            <span class="profile-info-value" id="profile-joined">July 2026</span>
+          </div>
+        </div>
+        <div class="profile-divider"></div>
+        <div class="profile-stats">
+          <div class="profile-stat">
+            <span class="profile-stat-label">Total Complaints</span>
+            <span class="profile-stat-value" id="stat-total">15</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-label">Pending</span>
+            <span class="profile-stat-value pending" id="stat-pending">4</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat-label">Resolved</span>
+            <span class="profile-stat-value resolved" id="stat-resolved">11</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Summary Cards + Search -->
+      <div class="summary-col">
+        <div class="summary-cards">
+          <div class="summary-card total">
+            <span class="summary-label">Total Complaints</span>
+            <span class="summary-value" id="card-total">15</span>
+          </div>
+          <div class="summary-card pending">
+            <span class="summary-label">Pending</span>
+            <span class="summary-value" id="card-pending">4</span>
+          </div>
+          <div class="summary-card resolved">
+            <span class="summary-label">Resolved</span>
+            <span class="summary-value" id="card-resolved">11</span>
+          </div>
+        </div>
+
+        <!-- Search + New Complaint Button -->
+        <div class="toolbar">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="7" cy="7" r="5.25" stroke="#8695A4" stroke-width="1.5"/>
+              <path d="M11 11L14 14" stroke="#8695A4" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input type="text" id="complaint-search" placeholder="Search complaints by ticket #, category, or description...">
+          </div>
+          <button class="btn btn-primary" id="btn-new-complaint">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+              <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            New Complaint
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Complaint History Table ============ -->
+    <section class="card table-card">
+      <div class="table-head">
+        <div>
+          <h3>Complaint History</h3>
+          <p style="margin:4px 0 0; font-size:0.88rem;">All complaints you've submitted — newest first.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="complaint-table" id="complaint-table">
+          <thead>
+            <tr>
+              <th>Ticket #</th>
+              <th>Category</th>
+              <th>Complaint</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>City</th>
+              <th>State</th>
+              <th>Zip Code</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="complaint-tbody">
+            <!-- Rows inserted by JavaScript -->
+          </tbody>
+        </table>
+        <div id="table-empty" class="table-empty" style="display:none;">
+          No complaints match your search.
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ============ New Complaint Modal ============ -->
+<div class="modal-overlay" id="complaint-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>File a New Complaint</h2>
+      <button class="modal-close" id="modal-close" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+          <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <form id="complaint-form" class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label for="f-ticket">Ticket Number</label>
+          <div class="input-with-check">
+            <input id="f-ticket" type="text" readonly>
+            <span class="check-mark" title="Auto-generated">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 8.5L6.5 12L13 5" stroke="#2C5F63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+          <p class="form-note" style="margin:6px 0 0;">Auto-generated — read only</p>
+        </div>
+
+        <div class="field">
+          <label for="f-category">Category <span style="font-weight:400; color:var(--ink-soft);">(optional)</span></label>
+          <select id="f-category">
+            <option value="">Auto-detect for me</option>
+            <option value="Billing">Billing</option>
+            <option value="Financial">Financial</option>
+            <option value="Technical">Technical</option>
+            <option value="Service">Service</option>
+            <option value="Others">Others</option>
+          </select>
+          <p class="form-note" style="margin:6px 0 0;">Leave this on "Auto-detect" and our AI will categorize it for you.</p>
+        </div>
+
+        <div class="field grid-full">
+          <label for="f-complaint">Customer Complaint</label>
+          <textarea id="f-complaint" rows="4" placeholder="Describe your complaint in detail (minimum 20 characters)..." required></textarea>
+          <div class="field-hint" id="hint-complaint">20–1000 characters · At least 3 real words</div>
+          <p class="field-error" id="err-complaint"></p>
+        </div>
+
+        <div class="field">
+          <label for="f-date">Date</label>
+          <input id="f-date" type="date" required>
+          <p class="field-error" id="err-date"></p>
+        </div>
+
+        <div class="field">
+          <label>Time</label>
+          <div class="time-picker">
+            <select id="f-hour" required>
+              <!-- Hours 01-12 inserted by JS -->
+            </select>
+            <span class="time-colon">:</span>
+            <select id="f-minute" required>
+              <!-- Minutes 00-59 inserted by JS -->
+            </select>
+            <span class="time-colon">:</span>
+            <select id="f-second" required>
+              <!-- Seconds 00-59 inserted by JS -->
+            </select>
+            <select id="f-ampm" required>
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+          <p class="form-note" id="time-preview" style="margin:6px 0 0;">5:53:18 PM</p>
+          <p class="field-error" id="err-time"></p>
+        </div>
+
+        <div class="field grid-full">
+          <label for="city-search">City</label>
+          <div class="city-combo" id="city-combo">
+            <input id="city-search" type="text" placeholder="Search or choose a city in Myanmar..." autocomplete="off">
+            <button type="button" class="city-caret" id="city-caret" aria-label="Show cities">
+              <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="city-options" id="city-options" role="listbox"></div>
+          </div>
+          <input type="hidden" id="f-city" required>
+          <p class="field-error" id="err-city"></p>
+        </div>
+
+        <div class="field">
+          <label for="f-state">State / Region</label>
+          <input id="f-state" type="text" placeholder="Auto-filled after city" readonly required>
+        </div>
+
+        <div class="field">
+          <label for="f-zip">Zip Code</label>
+          <input id="f-zip" type="text" placeholder="Auto-filled after city" readonly required>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="btn-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Complaint</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ View Complaint Details Modal ============ -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head">
+      <h2>Complaint Details</h2>
+      <button class="modal-close" id="view-close" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+          <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="view-body">
+      <!-- Details inserted by JavaScript -->
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="view-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Note: there used to be an "Edit Complaint" modal here letting customers
+     change a complaint's category/status directly from this page. That's
+     been removed - per the SRS, editing category/status is an Admin
+     Dashboard capability, not a Customer Portal one. See script.js's
+     comment near wireActivitiesPage() and docs/FRONTEND_INTEGRATION.md
+     for the full writeup. -->
+
+<footer>
+  <div class="container footer-inner">
+    <span>© 2026 Loopline. All rights reserved.</span>
+    <span>Built for teams who listen.</span>
+  </div>
+</footer>
+
+<button class="chat-launcher" id="chat-launcher" aria-label="Open Loop Assistant">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6.5C4 5.1 5.1 4 6.5 4H17.5C18.9 4 20 5.1 20 6.5V14.5C20 15.9 18.9 17 17.5 17H9L5 20V17H6.5C5.1 17 4 15.9 4 14.5V6.5Z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/></svg>
+</button>
+
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-head">
+    <span class="chat-head-dot"></span>
+    <div>
+      <strong>Loop Assistant</strong>
+      <small>Usually replies within a few minutes</small>
+    </div>
+  </div>
+  <div class="chat-body" id="chat-body">
+    <div class="msg bot">Hi! I'm the Loop Assistant. Tell me what issue you ran into and I'll help get it to the right place.</div>
+  </div>
+  <div class="chat-input">
+    <input type="text" id="chat-text" placeholder="Describe your issue...">
+    <button id="chat-send" aria-label="Send">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8H13.5M13.5 8L9 3.5M13.5 8L9 12.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
