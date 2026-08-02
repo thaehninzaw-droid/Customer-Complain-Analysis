@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Chatbot — Loopline Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="admin-dashboard.html" class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="12" stroke="#2C5F63" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="#3F8489" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline<span class="admin-tag">Admin</span>
+    </a>
+    <div class="nav-links">
+      <a href="admin-dashboard.html">Dashboard</a>
+      <a href="admin-chatbot.html" style="color:var(--teal-dark); font-weight:600;">AI Chatbot</a>
+    </div>
+    <div class="nav-auth">
+      <div class="nav-account">
+        <span>Hi, <span id="admin-name">Admin</span></span>
+        <button class="btn btn-ghost btn-sm" id="admin-logout">Log out</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="activities-wrap">
+  <div class="container admin-chat-wrap">
+    <div class="activities-header">
+      <span class="eyebrow">Admin AI Chatbot</span>
+      <h1>Ask about a complaint</h1>
+      <p style="margin-bottom:0;">Grounded in the indexed SOP knowledge base (<code>data/knowledge_base/</code>) via Gemini + Qdrant. Optionally scope a question to one ticket.</p>
+    </div>
+
+    <div class="admin-chat-ticket-row">
+      <label for="ticket-scope">Ticket # (optional):</label>
+      <input type="number" id="ticket-scope" placeholder="e.g. 100042">
+      <span id="ticket-scope-status" style="font-size:0.82rem;"></span>
+    </div>
+
+    <div class="admin-chat-card">
+      <div class="admin-chat-history" id="chat-history">
+        <div class="admin-chat-msg bot">Ask me things like "How should I handle a repeat billing complaint?" or scope a question to a specific ticket number above.</div>
+      </div>
+      <div class="admin-chat-inputrow">
+        <input type="text" id="chat-input" placeholder="Ask a question...">
+        <button class="btn btn-primary" id="chat-send">Send</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="admin.js"></script>
+<script src="admin-chatbot.js"></script>
+</body>
+</html>
