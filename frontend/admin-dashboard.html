@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Loopline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="admin-dashboard.html" class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="12" stroke="#2C5F63" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="#3F8489" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline<span class="admin-tag">Admin</span>
+    </a>
+    <div class="nav-links">
+      <a href="admin-dashboard.html" style="color:var(--teal-dark); font-weight:600;">Dashboard</a>
+      <a href="admin-chatbot.html">AI Chatbot</a>
+    </div>
+    <div class="nav-auth">
+      <div class="nav-account">
+        <span>Hi, <span id="admin-name">Admin</span></span>
+        <button class="btn btn-ghost btn-sm" id="admin-logout">Log out</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="activities-wrap">
+  <div class="container">
+
+    <div class="activities-header">
+      <span class="eyebrow">Admin dashboard</span>
+      <h1>Complaint Management</h1>
+      <p style="margin-bottom:0;">Real-time complaints, auto-categorized and prioritized, with monthly trends and category breakdowns.</p>
+    </div>
+
+    <!-- ML model status -->
+    <div class="ml-status-row" id="ml-status-row">
+      <div class="ml-status-chip">
+        <span class="ml-status-dot" id="dot-category"></span>
+        <div>
+          <div class="ml-label">Algorithm 1 — Category classifier</div>
+          <div class="ml-metric" id="metric-category">Checking…</div>
+        </div>
+      </div>
+      <div class="ml-status-chip">
+        <span class="ml-status-dot" id="dot-priority"></span>
+        <div>
+          <div class="ml-label">Algorithm 2 — Priority predictor</div>
+          <div class="ml-metric" id="metric-priority">Checking…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="summary-cards" style="margin-bottom:24px;">
+      <div class="summary-card total">
+        <span class="summary-label">Total Complaints</span>
+        <span class="summary-value" id="stat-total">–</span>
+      </div>
+      <div class="summary-card pending">
+        <span class="summary-label">Pending / In Progress</span>
+        <span class="summary-value" id="stat-open">–</span>
+      </div>
+      <div class="summary-card resolved">
+        <span class="summary-label">Resolved / Closed</span>
+        <span class="summary-value" id="stat-closed">–</span>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Monthly Volume<span class="trend-pill" id="trend-pill" style="display:none;"></span></h3>
+        <p class="chart-sub">Complaints filed per month, last 12 months</p>
+        <canvas id="chart-monthly" height="110"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Category Distribution</h3>
+        <p class="chart-sub">Most frequent complaint types</p>
+        <canvas id="chart-category" height="110"></canvas>
+      </div>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Priority Distribution</h3>
+        <p class="chart-sub">Output of Algorithm 2 across all complaints</p>
+        <canvas id="chart-priority" height="110"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Status Distribution</h3>
+        <p class="chart-sub">Where complaints stand right now</p>
+        <canvas id="chart-status" height="110"></canvas>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <section class="card table-card">
+      <div class="table-head">
+        <div>
+          <h3>All Complaints</h3>
+          <p style="margin:4px 0 0; font-size:0.88rem;">Filter, search, edit status/category/priority inline, or add one manually.</p>
+        </div>
+        <button class="btn btn-primary" id="btn-new-complaint-admin">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+            <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Add Complaint
+        </button>
+      </div>
+
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="7" r="5.25" stroke="#8695A4" stroke-width="1.5"/>
+            <path d="M11 11L14 14" stroke="#8695A4" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="filter-search" placeholder="Search by ticket # or complaint text...">
+        </div>
+        <select id="filter-category">
+          <option value="">All categories</option>
+        </select>
+        <select id="filter-priority">
+          <option value="">All priorities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
+        <select id="filter-status">
+          <option value="">All statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Resolved">Resolved</option>
+          <option value="Closed">Closed</option>
+        </select>
+        <button class="filter-clear" id="filter-clear">Clear filters</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="complaint-table" id="admin-table">
+          <thead>
+            <tr>
+              <th>Ticket #</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Complaint</th>
+              <th>Date</th>
+              <th>City</th>
+              <th>Received Via</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody"></tbody>
+        </table>
+        <div id="admin-table-empty" class="table-empty" style="display:none;">No complaints match your filters.</div>
+      </div>
+
+      <div class="pagination" id="pagination">
+        <button id="page-prev">← Prev</button>
+        <span id="page-info">Page 1</span>
+        <button id="page-next">Next →</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- View Complaint Modal (read-only detail) -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head">
+      <h2>Complaint Details</h2>
+      <button class="modal-close" id="view-close" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+          <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="view-body"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="view-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div class="modal-overlay" id="manual-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Add Complaint Manually</h2>
+      <button class="modal-close" id="manual-close" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+          <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <form id="manual-form" class="modal-body">
+      <p class="form-note" style="margin:0 0 14px;">For complaints received by phone or other offline channels. Leave Category/Priority on "Auto" to let Algorithm 1 / Algorithm 2 fill them in.</p>
+      <div class="field">
+        <label for="m-complaint">Complaint description</label>
+        <textarea id="m-complaint" rows="4" placeholder="What did the customer report?" required></textarea>
+      </div>
+      <div class="form-grid-admin">
+        <div class="field">
+          <label for="m-category">Category</label>
+          <select id="m-category">
+            <option value="">Auto-detect</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-priority">Priority</label>
+          <select id="m-priority">
+            <option value="">Auto-detect</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-received-via">Received via</label>
+          <select id="m-received-via">
+            <option value="Manual Entry">Manual Entry</option>
+            <option value="Phone Call">Phone Call</option>
+            <option value="Email">Email</option>
+            <option value="In Person">In Person</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-status">Status</label>
+          <select id="m-status">
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="m-city">City (optional)</label>
+          <input id="m-city" type="text" placeholder="e.g. Yangon">
+        </div>
+        <div class="field">
+          <label for="m-state">State / Region (optional)</label>
+          <input id="m-state" type="text" placeholder="e.g. Yangon Region">
+        </div>
+        <div class="field">
+          <label for="m-zip">Zip code (optional)</label>
+          <input id="m-zip" type="text" placeholder="e.g. 11181">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="manual-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Complaint</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="admin.js"></script>
+<script src="admin-dashboard.js"></script>
+</body>
+</html>
