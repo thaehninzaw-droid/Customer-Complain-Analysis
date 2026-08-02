@@ -1,0 +1,63 @@
+name: Backend tests
+
+# This is the first environment in this project's history with both
+# internet access AND the full dependency set (fastapi, pydantic,
+# pytest, xgboost) installed at the same time - the sandbox this
+# backend was originally built in had neither (see ../docs/TESTING.md).
+# That means CI is where the FastAPI HTTP layer and the real XGBoost
+# training path both get to run for the first time, not just the
+# rule-based fallbacks and the parts that work without them.
+
+"on":
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Syntax check every module
+        run: python -m compileall -q app data tests
+
+      - name: Train Algorithm 1 (category classifier)
+        run: python -m app.ml.train_classifier
+
+      - name: Train Algorithm 2 (priority predictor)
+        run: python -m app.ml.train_priority
+
+      - name: Report which priority model actually trained
+        run: python -c "import json; m = json.load(open('app/ml/artifacts/priority_metrics.json')); print('Model used:', m['model'])"
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Upload trained model artifacts + metrics
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-artifacts
+          path: backend/app/ml/artifacts/
+          retention-days: 14
