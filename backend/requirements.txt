@@ -1,0 +1,27 @@
+fastapi
+uvicorn[standard]
+pymongo
+python-dotenv
+pydantic
+
+# --- ML (Algorithm 1: category classification, Algorithm 2: priority prediction) ---
+scikit-learn
+pandas
+joblib
+# XGBoost is the stretch-goal algorithm named in the SRS for priority
+# prediction. app/ml/train_priority.py auto-detects it and falls back
+# to scikit-learn's HistGradientBoostingClassifier if it isn't
+# installed (see that file's docstring) - so this is "nice to have,
+# not required." It wasn't installable in the sandbox this backend was
+# built in (no internet access there), but should install normally on
+# any machine with internet access.
+xgboost
+
+# --- RAG chatbot (Gemini + Qdrant) ---
+# Both talked to over plain REST via `requests` (see app/rag/) rather
+# than their official SDKs, on purpose - see app/rag/gemini_client.py's
+# docstring. requests is the only new dependency either needs.
+requests
+# PDF text extraction for the knowledge-base indexer, in case real SOP
+# PDFs get dropped into data/knowledge_base/ (see app/rag/knowledge_base.py).
+pypdf
