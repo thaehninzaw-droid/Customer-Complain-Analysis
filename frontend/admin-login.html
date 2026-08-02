@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login — Loopline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="12" stroke="#2C5F63" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="#3F8489" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline<span class="admin-tag">Admin</span>
+    </a>
+    <div class="nav-links"></div>
+    <div class="nav-auth">
+      <a href="login.html" class="btn btn-ghost btn-sm">Customer login</a>
+    </div>
+  </div>
+</nav>
+
+<div class="auth-wrap">
+  <form class="auth-card" id="admin-login-form">
+    <span class="eyebrow">Support team</span>
+    <h2>Admin login</h2>
+    <p style="margin-bottom: 1.4rem;">Log in with your admin account to reach the dashboard and AI chatbot. There's no admin sign-up — accounts are provisioned by the team (see docs/ADMIN_AUTH.md).</p>
+    <div class="field">
+      <label for="a-email">Email</label>
+      <input id="a-email" type="email" placeholder="admin@loopline.io" required>
+    </div>
+    <div class="field">
+      <label for="a-password">Password</label>
+      <input id="a-password" type="password" placeholder="••••••••" required>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Log in</button>
+    <p class="auth-switch">Not an admin? <a href="login.html" style="color:var(--teal-dark); font-weight:600;">Customer login</a></p>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="config.js"></script>
+<script>
+  // Minimal toast, mirrors script.js's version (kept standalone so this
+  // page doesn't need to load the full customer script.js).
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+
+  const form = document.getElementById('admin-login-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('a-email').value.trim();
+    const password = document.getElementById('a-password').value;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data && data.detail) || 'Invalid email or password.');
+
+      if (data.user.role !== 'admin') {
+        showToast('That account is not an admin account.');
+        return;
+      }
+      sessionStorage.setItem('loopline_session', JSON.stringify(data));
+      showToast(`Welcome, ${data.user.username}.`);
+      setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 500);
+    } catch (err) {
+      showToast(err.message || 'Login failed.');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
