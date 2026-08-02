@@ -1,0 +1,56 @@
+{
+  "trained_at": "2026-08-01T18:16:06.740384+00:00",
+  "dataset_path": "/home/claude/work/repo/backend/data/comcast_complaints.csv",
+  "dataset_is_synthetic": false,
+  "n_rows_total": 2224,
+  "n_train": 1779,
+  "n_test": 445,
+  "accuracy_vs_keyword_labels": 0.9303,
+  "classification_report": {
+    "Billing": {
+      "precision": 0.9879518072289156,
+      "recall": 0.82,
+      "f1-score": 0.8961748633879781,
+      "support": 100.0
+    },
+    "Financial": {
+      "precision": 0.9,
+      "recall": 0.8181818181818182,
+      "f1-score": 0.8571428571428571,
+      "support": 11.0
+    },
+    "Others": {
+      "precision": 0.898876404494382,
+      "recall": 0.9937888198757764,
+      "f1-score": 0.943952802359882,
+      "support": 161.0
+    },
+    "Service": {
+      "precision": 0.8545454545454545,
+      "recall": 0.94,
+      "f1-score": 0.8952380952380953,
+      "support": 50.0
+    },
+    "Technical": {
+      "precision": 0.9747899159663865,
+      "recall": 0.943089430894309,
+      "f1-score": 0.9586776859504132,
+      "support": 123.0
+    },
+    "accuracy": 0.9303370786516854,
+    "macro avg": {
+      "precision": 0.9232327164470278,
+      "recall": 0.9030120137903808,
+      "f1-score": 0.9102372608158451,
+      "support": 445.0
+    },
+    "weighted avg": {
+      "precision": 0.9349229533429783,
+      "recall": 0.9303370786516854,
+      "f1-score": 0.9296667844519457,
+      "support": 445.0
+    }
+  },
+  "label_source": "distant supervision from app.classify.keyword_classify (see module docstring / docs/ALGORITHMS.md)",
+  "model": "TfidfVectorizer(max_features=4000, ngram_range=(1,2)) + LogisticRegression(class_weight='balanced')"
+}
