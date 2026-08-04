@@ -150,6 +150,63 @@ def test_manual_category_overrides_auto_classify():
     assert resp.json()["category"] == "Service"
 
 
+def test_complaint_too_short_rejected_server_side():
+    # Regression guard for docs/DECISIONS.md #21/#22: this validation
+    # used to only exist in frontend/script.js, so a direct API call
+    # like this one could bypass it entirely.
+    auth = _signup(email="tooshort@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "too short"},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 400
+    assert "20" in resp.json()["detail"]
+
+
+def test_complaint_too_long_rejected_server_side():
+    auth = _signup(email="toolong@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "x" * 1001},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 400
+
+
+def test_complaint_with_unknown_city_rejected_server_side():
+    auth = _signup(email="badcity@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "My internet has been down for three days now.", "city": "Atlantis"},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 400
+    assert "Atlantis" in resp.json()["detail"]
+
+
+def test_complaint_with_known_city_accepted_case_insensitive():
+    auth = _signup(email="goodcity@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "My internet has been down for three days now.", "city": "yangon"},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["city"] == "yangon"  # stored as sent, only validated case-insensitively
+
+
+def test_complaint_with_no_city_still_works():
+    # city is optional - omitting it must never trigger the new validation
+    auth = _signup(email="nocity@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "My internet has been down for three days now."},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 200
+
+
 # ------------------------------------------------------- public/misc ----
 
 def test_dashboard_stats():
@@ -173,6 +230,15 @@ def test_categories_endpoint():
     resp = client.get("/categories")
     assert resp.status_code == 200
     assert resp.json() == ["Billing", "Financial", "Technical", "Service", "Others"]
+
+
+def test_cities_endpoint():
+    resp = client.get("/cities")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 63
+    assert all({"city", "state", "zip"} == set(entry.keys()) for entry in body)
+    assert any(entry["city"] == "Yangon" for entry in body)
 
 
 def test_chatbot_recommend():
@@ -239,6 +305,20 @@ def test_admin_manual_entry_and_inline_edit():
 
     missing = client.patch("/admin/complaints/999999", json={"status": "Resolved"}, headers=headers)
     assert missing.status_code == 404
+
+
+def test_admin_manual_entry_also_enforces_server_side_validation():
+    # POST /admin/complaints shares the same validation as the
+    # customer-facing POST /complaints - an admin fat-fingering a
+    # manual entry should get the same clear rejection.
+    admin = _admin_login()
+    headers = _auth_headers(admin["token"])
+    resp = client.post(
+        "/admin/complaints",
+        json={"complaint": "short", "city": "Nowhereville"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
 
 
 def test_admin_analytics_shape():

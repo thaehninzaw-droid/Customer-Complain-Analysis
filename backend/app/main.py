@@ -9,6 +9,7 @@ from .analytics import compute_analytics
 from .auth import AuthError, build_new_user, next_user_id, validate_signup
 from .categories import CATEGORIES
 from .chatbot import ask_admin_chatbot, get_recommendation
+from .cities import MYANMAR_CITIES
 from .classify import classify_complaint
 from .db import get_collection
 from .ml import classifier_model, priority_model
@@ -31,6 +32,7 @@ from .pulse import compute_pulse
 from .security import verify_password
 from .sessions import create_session, get_user_id_for_token
 from .tickets import next_ticket_no
+from .validation import ComplaintValidationError, validate_city, validate_complaint_text
 
 YANGON_TZ = timezone(timedelta(hours=6, minutes=30))
 VALID_STATUSES = ["Pending", "In Progress", "Resolved", "Closed"]
@@ -172,6 +174,12 @@ def create_complaint(complaint: ComplaintIn, user_id: int = Depends(get_current_
     (Algorithm 1) and priority (Algorithm 2) are auto-predicted UNLESS
     the client sends one (keeps a manual dropdown/override working
     too) - see app/classify.py and app/priority.py."""
+    try:
+        validate_complaint_text(complaint.complaint)
+        validate_city(complaint.city)
+    except ComplaintValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     category = complaint.category or classify_complaint(complaint.complaint)
     priority = complaint.priority or predict_priority(complaint.complaint, category)
     now = datetime.now(YANGON_TZ)
@@ -238,6 +246,19 @@ def list_categories():
     return CATEGORIES
 
 
+@app.get("/cities")
+def list_cities():
+    """Single source of truth for the Myanmar city -> state/zip lookup
+    (see app/cities.py) - added so server-side validation (used by
+    POST /complaints and POST /admin/complaints) and the frontend's
+    own copy in script.js's MYANMAR_CITIES aren't the only two places
+    this list can ever be checked against. The frontend doesn't fetch
+    from here yet (still uses its own hardcoded copy, generated from
+    the exact same source - see docs/DECISIONS.md #22) - a reasonable
+    follow-up, not done in this pass."""
+    return MYANMAR_CITIES
+
+
 # --------------------------------------------------------- admin: complaints ----
 
 @app.get("/admin/complaints", response_model=AdminComplaintListOut)
@@ -296,6 +317,12 @@ def create_complaint_admin(complaint: AdminComplaintIn, admin_id: int = Depends(
     manually input complaints, e.g. received via phone call'). Not
     tied to a customer's session/account - user_id is set to 0 to mean
     "no linked customer account" (see models.AdminComplaintIn)."""
+    try:
+        validate_complaint_text(complaint.complaint)
+        validate_city(complaint.city)
+    except ComplaintValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     category = complaint.category or classify_complaint(complaint.complaint)
     priority = complaint.priority or predict_priority(complaint.complaint, category)
     now = datetime.now(YANGON_TZ)
