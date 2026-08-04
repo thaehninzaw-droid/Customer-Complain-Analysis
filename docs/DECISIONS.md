@@ -375,7 +375,340 @@ design): real Gemini/Qdrant calls, real MongoDB Atlas - both still
 genuinely untested anywhere. See docs/TESTING.md for the current,
 precise breakdown of what's confirmed vs. still open.
 
-## Open questions - not yet decided by the team
+## Decision 19: Reviewed a peer team's repo - two small things adopted, most of it wasn't
+
+A junior team's zipped repo (same shared "Loopline" starter template)
+was reviewed as a reference, not a source of truth - diffed against
+our own copy of that same starter to isolate exactly what they'd
+actually changed, rather than taking any of it at face value. Full
+verdict: their scope was much smaller (basic Flask signup/login, the
+mostly-unmodified starter frontend, a data-cleaning script; no
+classification algorithm, no priority prediction, no admin anything,
+no tests, no CI). Two things worth flagging from that review, for the
+record:
+
+- **Not adopted, worth knowing about**: their backend stores and
+  compares passwords in **plaintext** (no hashing at all), and their
+  session model is just the username string held client-side - the
+  same IDOR-shaped issue this project already found and fixed (see
+  Decision 9). Their `clean_data.py` also has two real bugs of its
+  own: converting Zip code to an integer silently drops the leading
+  zero on ~170/2224 rows, and it applies the wrong `strptime` format
+  to the raw `"Date"` column, silently nulling it out entirely. Noted
+  here mainly as a "we checked, and this is worse, not just
+  different" data point, not as a criticism of them specifically.
+
+- **Adopted**: a password show/hide toggle on the login/signup
+  password fields (small, safe, clearly better UX; see the `.pw-field`/
+  `.pw-toggle` CSS and the wiring in `auth.js`).
+
+- **Adopted the idea, not the execution**: their `clean_data.py`
+  remaps every complaint date from 2015 to 2025, apparently to make
+  demo dashboards look current. Their specific execution has the date-
+  parsing bug mentioned above and permanently alters the year (losing
+  the ability to ever recover the true date), which isn't something
+  to copy. But the underlying problem is real - a decade-old dataset
+  makes a "recent activity" dashboard look dead - and it's a good fit
+  for something we'd already solved a different way (Decision 17's
+  data-driven monthly-volume window). Implemented properly as an
+  **opt-in `--demo-shift-dates` flag** on `data/load_dataset.py`:
+  shifts every row by a single shared day-offset (not just the year)
+  so the LATEST complaint lands on today and every complaint keeps its
+  exact relative spacing to every other one - the real dataset's
+  June-2015 spike (see Decision 17) shifts intact as a single visible
+  spike, just relabeled into a recent-feeling window. Off by default;
+  the canonical CSV file on disk is never touched, only whatever gets
+  written into the target database. Needed zero changes to
+  `app/analytics.py`, since that file already windows off the data's
+  own date range rather than a fixed one - this is a direct payoff of
+  Decision 17's fix. Never cite demo-shifted dates as the real
+  analysis period in the thesis - the true period is 2015 (see
+  docs/ALGORITHMS.md).
+
+## Decision 20: This session - reproduced CI locally, confirmed real XGBoost artifacts, added a live HTTP smoke test, and hit a real network wall on Mongo/Gemini/Qdrant/deploy
+
+**Context:** Picked this project back up per `HANDOFF.md`'s priority
+order (real Mongo → real Gemini/Qdrant → deploy → manual click-
+through). This session's sandbox turned out to have real PyPI/npm/
+GitHub access (unlike either prior sandbox described in
+`docs/TESTING.md`), so the first useful move was to actually install
+the full dependency set and see what's true right now, rather than
+assume the last session's CI-green claim still holds without checking.
+
+**What was actually run, for real, in this session:**
+
+1. **Dataset integrity check.** Compared the freshly-supplied
+   `Comcast_Telecom_Complaints_Dataset.zip` against the CSV already
+   committed at `backend/data/comcast_complaints.csv` - identical
+   `md5sum`. No drift; the committed dataset is exactly the Kaggle
+   source file.
+2. **Full dependency install + CI reproduction, locally.** `pip
+   install -r requirements-dev.txt` succeeded outright, including
+   `xgboost` - this session's sandbox has genuine internet access to
+   PyPI, which neither prior build/CI environment combination had
+   verified locally before (CI was green on GitHub's runners, per the
+   last handoff, but nobody had reproduced that locally until now).
+   Ran, in order: `compileall`, `python -m app.ml.train_classifier`
+   (93.0% accuracy vs. keyword labels - matches the documented figure
+   exactly), `python -m app.ml.train_priority`, and `pytest -v`: **83
+   passed, 0 failed.**
+3. **The XGBoost nuance from the last handoff is now resolved.**
+   Retraining `train_priority.py` locally (now that `xgboost` installs)
+   produced `priority_metrics.json` with `"model":
+   "XGBClassifier(n_estimators=200, max_depth=4)"` - the shipped
+   artifacts in `backend/app/ml/artifacts/` are genuine XGBoost now,
+   not the scikit-learn `HistGradientBoostingClassifier` fallback the
+   last session shipped. Same 100% accuracy vs. baseline-heuristic
+   labels as before - the number didn't change, only which model
+   family produced it.
+4. **Added a live, end-to-end HTTP smoke test** -
+   `backend/scripts/manual_api_smoke_check.py` - that starts a real
+   `uvicorn` process (in-memory DB fallback, same as CI) and drives it
+   over real HTTP with `requests`, rather than FastAPI's in-process
+   `TestClient` (which `tests/test_api.py` already covers). This is a
+   meaningfully different check: it exercises the full customer flow
+   (signup → login → file a complaint → auto-categorized "Billing" /
+   "High" priority for an angry billing complaint, a sensible result →
+   appears in the caller's own activities → unauthenticated access
+   correctly rejected) and the full admin flow (admin login → a valid
+   *customer* token correctly gets `403` on `/admin/complaints`, not
+   just reviewed-by-eye - see the false alarm below → list/manual-entry/
+   inline-edit/analytics/ml-status → chatbot `ask` correctly discloses
+   `used_rag: false` since no Gemini key is configured). **20/20
+   checks passed** on the second run (see next paragraph for the first
+   run's false alarm).
+5. **A false alarm worth recording, in the spirit of Decision 17/19's
+   "document what you actually found":** the smoke test's first run
+   showed 10 failures, including "customer token on `/admin/complaints`
+   gets 401, not the documented 403." Traced it before concluding
+   anything: the smoke test's own generated username
+   (`smoketest_<unix-timestamp>`) violates `app/auth.py`'s own username
+   validation (letters/numbers/spaces only, no underscore) - signup
+   failed with `400` before a real token ever existed, so every
+   downstream call in that run (including the admin one) was using a
+   missing/invalid token, which correctly returns `401`. Reading
+   `get_current_admin_id` in `app/main.py` directly confirmed the 403
+   check *is* there and *is* reached separately from the 401 check;
+   fixing the test's username format (not the app) made all 20 checks
+   pass, including the real 403 case. Recorded here mainly as a
+   reminder that a failing check is a reason to trace the cause before
+   editing app code, not a reason to assume the app is wrong -
+   consistent with this project's own standard (Section 4 of
+   `HANDOFF.md`).
+6. **Confirmed, by direct request, that this session cannot reach
+   MongoDB Atlas, the Gemini API, Qdrant Cloud, or Render at all** -
+   each returns `403` with header `x-deny-reason: host_not_allowed`
+   from the sandbox's own egress proxy, before the request ever leaves
+   for the real service (a `pypi.org` request in the same test returns
+   a normal `200`, confirming this is host-specific, not a general
+   outage). **This means priorities #1-3 in `HANDOFF.md` Section 5
+   cannot be attempted from inside this session at all, regardless of
+   whether real credentials are supplied to it** - it's a network
+   policy on the environment, not a credentials gap. Flagged plainly
+   rather than quietly attempted-and-failed-silently, per this
+   project's own "fallbacks over hard failures, always disclosed"
+   standard (`HANDOFF.md` Section 4.3) - the same principle, applied to
+   what this *session* can't do, not just what the *code* falls back to.
+7. **A second, smaller self-inflicted bug, also worth recording:** the
+   smoke-check script was first named `manual_api_smoke_test.py`.
+   Running the full suite with a fresh venv (a clean-room check before
+   handing anything off) turned up `pytest` trying to *collect* it as a
+   test module and failing at import time with a `ConnectionError` -
+   its filename matched pytest's default `*_test.py` discovery
+   pattern, so plain `pytest -q` from `backend/` picked it up and ran
+   its module-level code (real HTTP calls) during collection, with no
+   server running. This would have broken CI the next time it ran.
+   Fixed by renaming it to `manual_api_smoke_check.py` (outside the
+   default discovery patterns) and restructuring it so nothing executes
+   at import time - all logic now lives inside `main()`, guarded by
+   `if __name__ == "__main__":`. Re-ran a fresh-venv `pytest -q` after
+   the fix: 83 passed, 0 errors, nothing collected from `scripts/`.
+   Recorded because it's a generically useful lesson for this repo:
+   *any* new script dropped into `backend/` that happens to match
+   `test_*.py`/`*_test.py` will get silently collected by a bare
+   `pytest` invocation, whether or not it's actually a test.
+
+**What this changes vs. the last handoff:** items already marked ✅ in
+`docs/TESTING.md`'s "Confirmed by CI" section are now *also* confirmed
+independently, locally, in a different environment than GitHub's
+runners - a stronger signal than either alone. Items still marked ⚠️
+(real Mongo/Gemini/Qdrant) are unchanged and now additionally confirmed
+*unreachable from this particular session*, which is new, useful
+information even though it isn't progress on those three items
+themselves.
+
+**What's still open:** exactly `HANDOFF.md`'s priorities #1-3, unchanged
+- they need a network-unrestricted environment (your own machine, or a
+session/tool with those hosts allow-listed) to move at all. See
+`ROADMAP.md`'s new "hard constraint" note for the practical options.
+
+---
+
+## Decision 21: Junior team's "new feature" request (Myactivities.zip) turned out to already exist, more completely - plus a new junior-facing setup guide
+
+**Context:** A junior team member proposed a customer complaint-filing
++ tracking feature (`Myactivities.zip` - a standalone Flask+MongoDB
+prototype: file a complaint, get a ticket number, see a dashboard with
+status tiles and a searchable history). Before building anything, this
+needed comparing against what Loopline already has.
+
+**Finding (received pre-analyzed from a prior chat session in this
+project, not independently re-verified in this session - flagged
+explicitly per this doc's own standard of saying what was and wasn't
+actually checked):** the proposed feature already exists in Loopline,
+more completely, on every axis compared - real ML-based category/
+priority auto-assignment (the prototype has neither), a real status
+workflow (the prototype's status is always `"Pending"`, nothing ever
+updates it), hashed passwords + session-token auth + server-side data
+isolation (the prototype stores plaintext passwords and returns every
+user's complaints to anyone), a larger Myanmar city list (63 vs. 10),
+and admin tooling the prototype has none of. Two implementation
+details in the prototype were flagged as arguably better than
+Loopline's current behavior and worth borrowing as small hardening
+items, not new features: (1) server-side complaint-length and city
+validation - Loopline currently only validates these client-side in
+`script.js`, bypassable via a direct API call; (2) serving the city
+list from a `GET /cities`-style endpoint rather than only embedding it
+in frontend JS. **Neither has been implemented yet** - recorded here as
+a known, small, not-yet-done backlog item, not a completed decision.
+
+**Decision:** don't build anything new off this request. If time
+allows, add server-side validation to `POST`/`PATCH` complaint
+endpoints in `app/main.py` matching what `script.js` already enforces
+client-side, and consider exposing the Myanmar city list via a small
+`GET /cities` endpoint the frontend could optionally use instead of
+its own hardcoded copy. Neither blocks anything else.
+
+**Also this session:** added `docs/GETTING_STARTED.md` - a step-by-step
+setup guide assuming no prior familiarity with the codebase, venvs, or
+even that Python is installed yet, for junior team members or anyone
+picking this project up cold. Distinct from `backend/README.md`'s
+quickstart (terse, assumes experience) and `HANDOFF.md` (written for
+whoever/whatever continues this work session-to-session, assumes a lot
+of project context already). Its Step 10 worked example (adding a
+`version` field to the health-check endpoint) was actually implemented,
+tested (`pytest` - 83 passed, plus a live `curl` check confirming the
+exact response body documented), and then reverted before shipping -
+so the instructions are proven correct rather than just written from
+memory, but the repo itself is left in its prior state so the exercise
+still has something for the reader to actually do.
+
+---
+
+---
+
+## Decision 22: Implemented the two hardening items from #21 - server-side complaint validation + `GET /cities`
+
+**Context:** Decision 21 flagged two small, not-yet-done hardening
+ideas after evaluating the junior-proposed `Myactivities.zip`
+prototype - server-side complaint length/city validation, and exposing
+the Myanmar city list from the backend. Asked directly "is this worth
+adopting" - yes for these two specific, narrow items (the broader
+feature/UI was not adopted; see #21 for why).
+
+**What was built:**
+
+1. **`app/cities.py`** - the single source of truth for the 63-entry
+   Myanmar city → state/zip lookup, mirroring `app/categories.py`'s
+   existing pattern exactly. Generated by parsing `frontend/script.js`'s
+   existing `MYANMAR_CITIES` constant programmatically (not retyped by
+   hand) to rule out transcription drift - verified afterward that all
+   63 entries round-tripped correctly.
+2. **`GET /cities`** - added the same way `GET /categories` already
+   works: returns the full list, no auth required.
+3. **`app/validation.py`** - `validate_complaint_text()` (20-1000
+   chars after trimming, matching `frontend/script.js`'s existing
+   bound exactly) and `validate_city()` (case-insensitive match
+   against `app/cities.py`, only checked if a non-blank city was
+   actually sent - it's still an optional field). Deliberately does
+   *not* port `script.js`'s fuzzier gibberish/repeated-character/
+   junk-word heuristics - those are reasonable as a live-typing UI
+   nudge, but too subjective to hard-reject on server-side, where a
+   false positive just silently loses a legitimate complaint with no
+   chance for the user to see why as they type.
+4. Wired into both `POST /complaints` and `POST /admin/complaints` -
+   same validation, same `400` response shape as the rest of this
+   codebase's error handling (`{"detail": "<message>"}`, not raw
+   Pydantic validation errors).
+
+**Verified, not just written:** added `tests/test_cities.py` (data
+integrity - no duplicate cities, all fields present),
+`tests/test_validation.py` (11 unit tests covering both boundaries,
+case-insensitivity, optional-field behavior), and 7 new integration
+tests in `tests/test_api.py` hitting the real HTTP endpoints. Also
+caught and fixed a real bug this introduced: `backend/scripts/
+manual_api_smoke_check.py` (added in #20) was using US cities
+("Springfield", "Chicago") for its test data, which the new validation
+now correctly rejects - updated it to use real entries from
+`app/cities.py` (Yangon, Mandalay) instead, and added two new checks
+to it for the validation behavior itself and one for `GET /cities`.
+Full suite after all of this: **103 passed** (was 83). Live smoke
+check: **23 passed** (was 20).
+
+**Known, explicitly-flagged loose end:** `frontend/script.js` still
+has its own hardcoded copy of `MYANMAR_CITIES`, not fetched from
+`GET /cities`. Today the two are identical (the backend copy was
+generated *from* the frontend's), so there's no drift yet - but
+there's nothing stopping them from drifting apart the next time either
+one is edited without the other. Not fixed in this pass because it
+means touching the autocomplete widget's filtering/matching logic in
+`script.js` (a few hundred lines, not read closely enough this session
+to be confident editing it live), which is a meaningfully different
+risk profile than a backend-only addition. Worth doing properly in its
+own pass, following exactly the comment already in `script.js` above
+`populateCategorySelect()` for how the same problem was solved for
+categories.
+
+---
+
+## Decision 23: Doc audit before push - `GETTING_STARTED.md` and others were stale after #22
+
+**Context:** Asked directly "are you sure the docs and setup guide are
+correct" before pushing to GitHub. Answer at that point would have
+been no - #22 grew the test suite from 83→103 and the smoke check from
+20→23, added two new files (`app/cities.py`, `app/validation.py`) and
+a new endpoint (`GET /cities`), but `docs/GETTING_STARTED.md` (written
+in the session before #21/#22) still said `85 tests` / `85 passed` in
+three places, and neither it nor `backend/README.md` nor
+`docs/FRONTEND_INTEGRATION.md` mentioned the new module or endpoint at
+all. Caught by actually re-running the exact commands the guide tells
+a junior to type, not by re-reading the prose.
+
+**Fixed:**
+- `docs/GETTING_STARTED.md`: corrected `85`→`103`/`1 passed` claims in
+  Step 8 and Step 10 (re-ran both exact commands to confirm the new
+  numbers first), added `cities.py`/`validation.py` to the "where do I
+  look" table (Step 9), added a troubleshooting row for the new `400`
+  validation responses.
+- `backend/README.md`: added `GET /cities` to the endpoint list, noted
+  the new server-side validation on `POST /complaints`.
+- `docs/FRONTEND_INTEGRATION.md`: added a "Cities" section parallel to
+  the existing "Categories" one, explicitly noting the frontend hasn't
+  migrated to `GET /cities` yet (the same loose end already flagged in
+  #22 - now discoverable from the doc whose whole purpose is tracking
+  this exact kind of thing, not just from the ADR log).
+- `docs/TESTING.md`: added a third "Update" paragraph so its opening
+  summary reflects the 103/23 current counts instead of stopping at
+  #20's 83/20, with an explicit note that older counts elsewhere in
+  this file and in `docs/DECISIONS.md` are correct *as history*, not
+  stale *as current status* - the ADR entries for #20-#22 were
+  deliberately left with their original point-in-time numbers, since
+  rewriting them to "103" would misrepresent what was actually true
+  when each decision was made.
+
+**Re-verified after fixing, not just after writing:** fresh venv,
+`pytest -q` → `103 passed`; `pytest tests/test_api.py -k health_check
+-v` → `1 passed` (the exact command Step 10 tells a reader to run);
+live smoke check → `23 passed, 0 failed`. All three numbers now match
+what the docs claim, checked in that order specifically because that's
+the order a junior would hit them following the guide.
+
+**Lesson for next time, stated plainly:** a multi-file doc change
+(#21/#22 touched five docs, `GETTING_STARTED.md` wasn't one of the
+five) is exactly the situation where something gets missed - worth a
+grep for hardcoded counts/filenames across the whole `docs/` tree as a
+last step whenever a change touches test counts, endpoints, or module
+names, not just updating the docs that were "obviously" related.
 
 - ~~**RAG chatbot stack:** which LLM and vector database?~~ **Resolved
   (Decision 14):** Gemini + Qdrant.

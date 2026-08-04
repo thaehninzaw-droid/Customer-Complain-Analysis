@@ -15,6 +15,26 @@ and `#f-category` (activities.html's complaint form) - the hardcoded
 `<option>` lists still in the HTML are just there as a visible
 fallback until the fetch completes (or if the API's ever unreachable).
 
+## Cities: single source of truth on the backend now, frontend not yet migrated (partly done)
+
+`app/cities.py` was added as the same kind of single source of truth
+for the 63-entry Myanmar city → state/zip lookup (`GET /cities`),
+generated directly from `script.js`'s existing `MYANMAR_CITIES`
+constant so the two started out identical - see `docs/DECISIONS.md`
+#22. **Unlike categories, the frontend doesn't fetch this yet** -
+`script.js`'s city autocomplete (`MYANMAR_CITIES`, the filtering
+around it, and the exact-match check in the complaint form's submit
+handler) still uses its own hardcoded copy. The two are identical
+today, but nothing keeps them that way if either gets edited alone
+later - the same drift problem categories used to have. Migrating it
+would follow the exact same shape as `populateCategorySelect()` above:
+fetch `/cities` once, keep the hardcoded array only as a fallback if
+the fetch fails, and swap every reference to `MYANMAR_CITIES` in the
+autocomplete/validation code for whichever variable holds the
+fetched-or-fallback data. Not done yet because it touches that
+autocomplete widget's matching logic directly, which deserves its own
+careful pass rather than being folded into a backend-focused change.
+
 ## Auth: real sessions, not localStorage (done)
 
 `auth.js` used to keep a `users` array in `localStorage` and "log in"

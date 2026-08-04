@@ -10,6 +10,11 @@ See `../docs/` for the full documentation set (architecture, the two
 ML algorithms, the RAG chatbot, admin auth, deployment) and
 `../ROADMAP.md` for what's done vs. still ahead.
 
+**First time here? `../docs/GETTING_STARTED.md` walks through all of
+this step-by-step, assuming nothing installed yet.** The quickstart
+below is the fast, no-explanation version for anyone who's done this
+before.
+
 ## Quickstart
 
 ```bash
@@ -42,9 +47,12 @@ console output for the email/password (defaults: `admin@loopline.io` /
   auto-prioritized (**Algorithm 2**) unless the client overrides
   either. `user_id` comes from the session token, never the request
   body (fixes a real IDOR vulnerability - see DECISIONS.md #9).
+  Server-side validates complaint length (20-1000 chars) and, if
+  sent, that `city` is a recognized one (see `app/validation.py`,
+  DECISIONS.md #22).
 - `GET /complaints` - the caller's own complaints only.
-- `GET /dashboard-stats`, `GET /issues/pulse`, `GET /categories` -
-  public aggregate/reference endpoints.
+- `GET /dashboard-stats`, `GET /issues/pulse`, `GET /categories`,
+  `GET /cities` - public aggregate/reference endpoints.
 - `POST /chatbot/recommend` - category + a recommended action, backed
   by the real RAG pipeline if `GEMINI_API_KEY` is set, a template
   otherwise (see docs/RAG_CHATBOT.md).
@@ -108,6 +116,20 @@ Reload the real data or point at a different CSV:
 ```bash
 python -m data.load_dataset data/comcast_complaints.csv
 ```
+
+For a live demo where a decade-old dataset makes the dashboard look
+inactive, add `--demo-shift-dates` to shift every complaint's date
+forward by a fixed offset so the most recent one lands on today (exact
+relative spacing between all complaints is preserved - the real
+dataset's busiest-month spike shows up intact, just relabeled into a
+recent window):
+```bash
+python -m data.load_dataset data/comcast_complaints.csv --demo-shift-dates
+```
+This only affects what gets loaded into the database - the CSV file on
+disk is never modified. Never cite demo-shifted dates as real
+historical data; see `docs/ALGORITHMS.md` for the true analysis period
+(2015) and `docs/DECISIONS.md` #19 for why this exists.
 
 ## The RAG chatbot (Gemini + Qdrant)
 

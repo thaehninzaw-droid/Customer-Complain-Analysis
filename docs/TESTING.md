@@ -7,6 +7,32 @@ it for what's still genuinely unverified (real MongoDB, real
 Gemini/Qdrant - CI doesn't have credentials for either, so those code
 paths still haven't executed anywhere yet).
 
+**Update: independently reproduced locally, in a different sandbox
+than either CI or the original build environment** (see
+`docs/DECISIONS.md` #20 for the full account). That session had real
+PyPI access - `pip install -r requirements-dev.txt` succeeded outright,
+`pytest -v` ran 83/83 passing, both ML models retrained against the
+real dataset with matching numbers, and a new **live HTTP smoke test**
+(`backend/scripts/manual_api_smoke_check.py`, see below) drove a real
+running `uvicorn` process through the full customer and admin flows -
+20/20 checks passed. That same session confirmed it could *not* reach
+MongoDB Atlas, the Gemini API, Qdrant Cloud, or Render at all (blocked
+at the network level, not a credentials issue) - so the "⚠️ Still not
+runtime-executed anywhere" section below is unchanged and still
+accurate.
+
+**Update: server-side complaint validation + `GET /cities` added**
+(`docs/DECISIONS.md` #22) - the test suite grew from 83 to **103
+tests** (20 new: `tests/test_cities.py`, `tests/test_validation.py`,
+plus new integration tests in `tests/test_api.py`), all passing, and
+the live smoke check grew from 20 to **23 checks**, also all passing.
+If you see `83` or `20` referenced anywhere else in this project's
+history (commit messages, older parts of `docs/DECISIONS.md`), that
+was the accurate count *at that point in time* - `103`/`23` are
+current as of this note. Expect these numbers to keep growing; what
+matters when you run `pytest` yourself is `passed` with nothing after
+it, not the exact total.
+
 The rest of this document describes the situation as it stood while
 this backend was originally built: the environment had **no internet
 access** and did not have `fastapi`, `pydantic`, `pytest`, `httpx`,
@@ -71,6 +97,20 @@ exercised directly (both via the committed pytest-style test files in
 - All HTML files - checked for balanced/well-formed tags with Python's
   `html.parser`.
 - CSS - checked for balanced braces.
+- **Real-HTTP end-to-end smoke test** -
+  `backend/scripts/manual_api_smoke_check.py` - starts an actual
+  `uvicorn` process and drives it with the `requests` library (not
+  FastAPI's in-process `TestClient`, which is what `tests/test_api.py`
+  uses). Covers signup → login → file a complaint → confirms it's
+  auto-categorized and appears in the caller's own activities →
+  confirms an unauthenticated request is rejected; then admin login →
+  confirms a valid *customer* token is rejected with `403` on
+  `/admin/complaints` (not just reviewed by eye) → list/manual-entry/
+  inline-edit/analytics/ml-status → chatbot `ask` correctly reports
+  `used_rag: false` with no Gemini key configured. Run it yourself with
+  `uvicorn app.main:app &` then `python scripts/manual_api_smoke_check.py`
+  from `backend/`. **This still isn't the same as a human looking at
+  the rendered pages** - see item 2 in "before you trust this" below.
 
 ## ⚠️ Still not runtime-executed anywhere
 
@@ -105,9 +145,14 @@ exercised directly (both via the committed pytest-style test files in
    through both the customer flow (signup → file a complaint → see it
    in Activities) and the admin flow (admin login → dashboard loads →
    filters/pagination work → manually add a complaint → inline-edit a
-   status) at least once. CI proves the HTTP layer *responds
-   correctly*; it doesn't prove the pages *look* right or that the
-   charts render sensibly - that still needs a human looking at it.
+   status) at least once. **`backend/scripts/manual_api_smoke_check.py`
+   now covers the same two flows over real HTTP** (see above) - useful
+   for catching a broken response shape or a regressed auth check
+   quickly, but it only asserts on JSON, it doesn't look at a screen.
+   It proves the HTTP layer *responds correctly*; it doesn't prove the
+   pages *look* right, that the charts render sensibly, or that a real
+   browser's fetch/CORS/cookie behavior matches curl/`requests` - that
+   still needs a human looking at it in an actual browser at least once.
 3. If demoing the RAG chatbot, set `GEMINI_API_KEY`, run
    `python -m app.rag.knowledge_base`, and ask it a real question
    before relying on it live - confirm `used_rag: true` comes back,
@@ -120,6 +165,14 @@ exercised directly (both via the committed pytest-style test files in
    variables → Actions) pointing at a real cluster, then reference it
    in `.github/workflows/tests.yml`'s `env:` for the test step. Not
    done yet - see the section above.
+6. Items 3 and 5 (real Gemini/Qdrant, real MongoDB) need to be run
+   somewhere with actual internet access to those specific hosts, with
+   real credentials. A sandboxed coding session (this one included, as
+   of `docs/DECISIONS.md` #20) may have internet access to package
+   registries and still be unable to reach `*.mongodb.net`,
+   `generativelanguage.googleapis.com`, or Qdrant Cloud specifically -
+   worth confirming with a plain request to one of those hosts before
+   assuming a failure there is a credentials or code problem.
 
 None of the above changes any code - it's confirming that code already
 written and reviewed actually behaves as intended once it can run in a

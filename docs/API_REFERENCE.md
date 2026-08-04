@@ -35,12 +35,27 @@ Body: `{"complaint": str, "city"?: str, "state"?: str, "zipcode"?: str, "categor
 Algorithm 2 auto-fill. `user_id` is never in the body; it comes from
 the bearer token.
 
+Server-side validation (see `app/validation.py`, `docs/DECISIONS.md`
+#21/#22) → `400` if either fails:
+- `complaint`: 20-1000 characters after trimming whitespace.
+- `city`, if sent and non-blank: must match one of the 63 entries in
+  `app/cities.py` / `GET /cities` (case-insensitive). Omit it entirely
+  to skip this check.
+
 ### `GET /complaints` 🔒
 → `ComplaintOut[]` - only the caller's own complaints.
 
 ### `GET /categories`
 → `["Billing", "Financial", "Technical", "Service", "Others"]` - single
 source of truth, both frontend forms fetch this instead of hardcoding it.
+
+### `GET /cities`
+→ `[{"city": str, "state": str, "zip": str}, ...]` (63 entries) - single
+source of truth for the Myanmar city → state/zip lookup used by the
+complaint form's autocomplete and by the server-side `city` check
+above (`app/cities.py`). The frontend doesn't fetch from here yet
+(still uses its own hardcoded, identically-sourced copy in
+`script.js`'s `MYANMAR_CITIES`) - see `docs/DECISIONS.md` #22.
 
 ### `GET /dashboard-stats`
 → `{"total": int, "by_category": {...}, "by_status": {...}, "by_priority": {...}}`
@@ -74,7 +89,8 @@ Body (`AdminComplaintIn`): `{"complaint": str, "city"?, "state"?, "zipcode"?, "c
 → `ComplaintOut` (with `user_id: 0`, meaning "no linked customer account")
 
 For phone-in / walk-in / manually-logged complaints. `received_via`
-defaults to `"Manual Entry"`.
+defaults to `"Manual Entry"`. Same server-side `complaint`/`city`
+validation as `POST /complaints` above, → `400` on failure.
 
 ### `PATCH /admin/complaints/{ticket_no}` 🔒👑
 Body (`ComplaintUpdate`, all optional): `{"status"?, "category"?, "priority"?}`

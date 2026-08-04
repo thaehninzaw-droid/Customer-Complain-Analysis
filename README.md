@@ -20,10 +20,14 @@ loopline/
 
 ## Start here
 
+- **Brand new to this codebase, or to backend dev in general?** Read
+  `docs/GETTING_STARTED.md` - a step-by-step setup guide that assumes
+  nothing, written for anyone picking this up for the first time.
 - **New to the project, or picking this back up after a break?** Read
   `ROADMAP.md` first - status at a glance, then `docs/DECISIONS.md`
   for the full "why" behind every major choice.
-- **Running the backend locally?** `backend/README.md`.
+- **Running the backend locally?** `backend/README.md` (or
+  `docs/GETTING_STARTED.md` if you want the fully-explained version).
 - **Understanding the two ML algorithms** (category classification +
   priority prediction - what the thesis' "algorithm" requirement is
   built on)? `docs/ALGORITHMS.md`.
@@ -55,6 +59,7 @@ exactly what that means and what to check first). Full detail in
 
 | Doc | What's in it |
 |---|---|
+| `docs/GETTING_STARTED.md` | Step-by-step local setup for anyone new - assumes nothing |
 | `ROADMAP.md` | Status at a glance, next steps, known gaps |
 | `docs/ARCHITECTURE.md` | System overview, why it's shaped this way |
 | `docs/ALGORITHMS.md` | Both ML algorithms - methodology, bugs found & fixed, how to retrain |

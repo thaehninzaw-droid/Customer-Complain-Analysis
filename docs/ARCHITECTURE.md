@@ -88,6 +88,8 @@ loopline/
 │   │   ├── sessions.py         opaque token -> user_id
 │   │   ├── db.py               MongoDB / in-memory switch
 │   │   ├── categories.py       single source of truth for the 5 categories
+│   │   ├── cities.py            single source of truth for the 63-city Myanmar city/state/zip lookup
+│   │   ├── validation.py        server-side complaint length + city checks (POST /complaints, POST /admin/complaints)
 │   │   ├── classify.py         Algorithm 1 dispatcher + keyword baseline
 │   │   ├── priority.py         Algorithm 2 dispatcher + rule-based baseline
 │   │   ├── sentiment.py        lexicon-based sentiment/urgency scorer
@@ -114,6 +116,8 @@ loopline/
 │   │   ├── sample_complaints.csv
 │   │   ├── synthetic_complaints.csv  (generated)
 │   │   └── knowledge_base/        SOP markdown docs indexed by the chatbot
+│   ├── scripts/
+│   │   └── manual_api_smoke_check.py  live-HTTP end-to-end check, see docs/TESTING.md
 │   └── tests/
 ├── frontend/
 │   ├── index.html, login.html, signup.html, activities.html   (customer)
