@@ -84,6 +84,19 @@ async function llApiPost(path, body) {
   return data;
 }
 
+// ---------- Password show/hide toggle ----------
+document.querySelectorAll('.pw-toggle').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.querySelector('.icon-eye').style.display = showing ? 'block' : 'none';
+    btn.querySelector('.icon-eye-off').style.display = showing ? 'none' : 'block';
+    btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  });
+});
+
 // ---------- signup ----------
 const signupForm = document.getElementById('signup-form');
 if (signupForm) {

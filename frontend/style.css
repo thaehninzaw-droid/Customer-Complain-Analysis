@@ -1597,3 +1597,32 @@ footer {
   gap: 16px;
 }
 @media (max-width: 600px) { .form-grid-admin { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   Password show/hide toggle — small UX addition, adapted from a design
+   idea in a peer team's repo (see docs/DECISIONS.md #19). Reuses the
+   existing .field input styling; the toggle button just overlays it.
+   ========================================================================== */
+.pw-field {
+  position: relative;
+}
+.pw-field input {
+  padding-right: 44px;
+}
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  border-radius: 8px;
+}
+.pw-toggle:hover { color: var(--teal-dark); background: var(--teal-tint); }
