@@ -1,6 +1,6 @@
 {
-  "trained_at": "2026-08-01T18:16:11.567455+00:00",
-  "dataset_path": "/home/claude/work/repo/backend/data/comcast_complaints.csv",
+  "trained_at": "2026-08-03T10:43:31.658820+00:00",
+  "dataset_path": "/home/claude/work/loopline/backend/data/comcast_complaints.csv",
   "dataset_is_synthetic": false,
   "n_rows_total": 2224,
   "n_train": 1779,
@@ -45,6 +45,6 @@
     "High": 86
   },
   "label_source": "distant supervision from app.priority.predict_priority_baseline (see module docstring / docs/ALGORITHMS.md)",
-  "model": "HistGradientBoostingClassifier(max_depth=4) [xgboost not installed - see module docstring]",
+  "model": "XGBClassifier(n_estimators=200, max_depth=4)",
   "features": "sentiment/urgency signals (app.sentiment) + one-hot category + 500-feature TF-IDF (see app/ml/features.py)"
 }
