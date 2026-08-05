@@ -295,11 +295,14 @@ jump straight to whatever you're actually trying to change:
 | Server-side complaint length / city checks | `backend/app/validation.py` |
 | Anything admin-only | search `backend/app/main.py` for `/admin/` |
 | The AI chatbot | `backend/app/chatbot.py`, `backend/app/rag/` |
+| The RAG knowledge base (SOP docs the chatbot searches) | `backend/data/knowledge_base/` — drop `.md`, `.txt`, or `.pdf` files here, then re-run `python -m app.rag.knowledge_base` |
 | How the database connection works (or its fallback) | `backend/app/db.py` |
 | A customer-facing page's look/behavior | `frontend/*.html` + matching `.js` file (e.g. `activities.html` ↔ `script.js`) |
 | An admin page's look/behavior | `frontend/admin-*.html` + `admin*.js` |
 | Shared styling | `frontend/style.css` |
 | Where the frontend points its API calls | `frontend/config.js` |
+| What data trains the ML models | `backend/data/comcast_complaints.csv` (real Kaggle data, 2224 rows, 2025 dates) |
+| What data the RAG chatbot searches | `backend/data/knowledge_base/` — SOP `.md`/`.pdf` files, NOT the training CSV |
 
 For the bigger picture (why things are structured this way, not just
 where they live), see `docs/ARCHITECTURE.md`. For the full list of

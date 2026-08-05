@@ -1,5 +1,34 @@
 # The RAG chatbot (Gemini + Qdrant)
 
+## Quick answer for junior team: what goes in `data/knowledge_base/`?
+
+**SOP (Standard Operating Procedure) documents — not the training
+datasets.** This is the most common point of confusion:
+
+| Thing | Used for | Format | Location |
+|---|---|---|---|
+| `comcast_complaints.csv` | Training **Algorithm 1** (category) and **Algorithm 2** (priority) | CSV | `backend/data/` |
+| `synthetic_complaints.csv` | Dev-only fallback if the CSV is missing | CSV | `backend/data/` |
+| SOP / playbook files | **RAG chatbot** knowledge base — what the admin AI searches | `.md`, `.txt`, or `.pdf` | `backend/data/knowledge_base/` |
+
+The five files already in `data/knowledge_base/` (one per complaint
+category) are Markdown SOP documents: step-by-step guides that tell an
+admin how to handle billing disputes, technical outages, etc. When an
+admin asks the chatbot "how should I handle a repeat billing complaint?",
+the chatbot embeds the question, searches Qdrant for the most relevant
+SOP chunks, and hands those to Gemini to generate a grounded answer.
+
+**PDF files are fully supported.** Drop any `.pdf` into `data/
+knowledge_base/` and re-run `python -m app.rag.knowledge_base` — it
+gets picked up automatically, no code changes needed. A real internal
+SOP manual PDF is a great fit here.
+
+**The training datasets are never read by the chatbot.** They only
+train the ML models (which run locally, without Gemini). The two
+pipelines are completely independent.
+
+---
+
 Two chatbot consumers, one underlying pipeline:
 
 - **Customer-facing widget** (`POST /chatbot/recommend`) - the
@@ -92,7 +121,8 @@ All in `.env` (see `.env.example`):
 | `QDRANT_API_KEY` | Only if using Qdrant Cloud | — | |
 | `QDRANT_COLLECTION` | No | `loopline_sop_chunks` | |
 
-## API shapes this was built against (verified July 2026)
+## API shapes this was built against (verified July 2026, corrected
+## against a real 400 error - see docs/DECISIONS.md #24)
 
 **Chat completion** - `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
 ```json
@@ -103,11 +133,23 @@ Header: `x-goog-api-key: <key>`. Response:
 
 **Embeddings** - `POST .../v1beta/models/{model}:embedContent`
 ```json
-{"content": {"parts": [{"text": "..."}]}, "taskType": "RETRIEVAL_DOCUMENT", "outputDimensionality": 768}
+{"model": "models/gemini-embedding-001", "content": {"parts": [{"text": "..."}]}, "taskType": "RETRIEVAL_DOCUMENT", "outputDimensionality": 768}
 ```
-Response: `data.embedding.values`. Batch version:
-`:batchEmbedContents` with a `"requests"` array, response
-`data.embeddings[*].values`.
+The `"model"` field inside the body is easy to assume is redundant
+(the model is already in the URL) and skip - don't. A real deployment
+hit a `400 Bad Request` traced to exactly that omission in
+`embed_text()` (see docs/DECISIONS.md #24) - every official example
+includes it. Response: `data.embedding.values`. Batch version:
+`:batchEmbedContents` with a `"requests"` array (each item needs its
+own `"model"` field too), response `data.embeddings[*].values`.
+
+If you hit a `400` here: the error shown in the admin chatbot UI now
+includes Google's actual response body (see `app/rag/gemini_client.py`'s
+`_raise_with_body()`), not just the HTTP status line - read that first.
+A bare 400 with no useful body text is more likely a project-level
+issue (billing not enabled, free tier unavailable in your region) than
+a malformed request - check the Google AI Studio / Cloud console
+directly rather than only re-reading this code.
 
 **Qdrant** - `PUT /collections/{name}` to create (`{"vectors": {"size":
 N, "distance": "Cosine"}}`), `PUT /collections/{name}/points` to

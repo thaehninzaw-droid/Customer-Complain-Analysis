@@ -7,6 +7,64 @@ const CATEGORY_COLORS = ['#3F8489', '#FFC94A', '#D64545', '#8695A4', '#2C5F63'];
 const STATUS_COLORS = { 'Pending': '#FFC94A', 'In Progress': '#3F8489', 'Resolved': '#2C5F63', 'Closed': '#8695A4' };
 const PRIORITY_COLORS = { 'Low': '#2C5F63', 'Medium': '#FFC94A', 'High': '#D64545' };
 
+// ---------------- Chart.js polish ----------------
+// Chart.js's own defaults (grey gridlines, a black default tooltip,
+// the browser's default sans font) read as "generic library chart"
+// next to the rest of this dashboard's custom-styled cards - this
+// section is the one place that gets a deliberate signature touch
+// (the doughnut center-total) plus quiet, consistent polish
+// everywhere else (soft gridlines, Inter throughout, ink-toned
+// tooltips) rather than a redesign. See docs/DECISIONS.md #24.
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.color = '#8695A4'; // --ink-faint
+  Chart.defaults.plugins.tooltip.backgroundColor = '#1B2430'; // --ink
+  Chart.defaults.plugins.tooltip.titleFont = { family: 'Inter', size: 12, weight: '600' };
+  Chart.defaults.plugins.tooltip.bodyFont = { family: 'Inter', size: 12 };
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.plugins.tooltip.boxPadding = 4;
+
+  // Signature touch: draws "<value>" + "<label>" centered in a
+  // doughnut's hole (e.g. the total complaint count). Opt in per-chart
+  // via `options.plugins.centerText = {display: true, value, label}`;
+  // does nothing on charts that don't set it (bar charts included).
+  Chart.register({
+    id: 'centerText',
+    afterDraw(chart) {
+      const opts = chart.config.options?.plugins?.centerText;
+      if (!opts || !opts.display) return;
+      const { ctx, chartArea: { left, right, top, bottom } } = chart;
+      const centerX = (left + right) / 2;
+      const centerY = (top + bottom) / 2;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = "700 28px 'Fraunces', serif";
+      ctx.fillStyle = '#1B2430';
+      ctx.fillText(String(opts.value), centerX, centerY - 10);
+      ctx.font = "600 11px 'Inter', sans-serif";
+      ctx.fillStyle = '#8695A4';
+      ctx.fillText(String(opts.label).toUpperCase(), centerX, centerY + 14);
+      ctx.restore();
+    },
+  });
+}
+
+// Shared axis styling for the two bar charts - soft, low-contrast
+// gridlines on the value axis only, no axis border line, so the
+// chart-card's own border does that job instead of a second one from
+// Chart.js right next to it.
+function barScale(axis) {
+  return {
+    beginAtZero: true,
+    ticks: { precision: 0, font: { family: 'Inter', size: 11 } },
+    grid: { color: '#EDF1F5', drawTicks: false },
+    border: { display: false },
+  };
+}
+const CATEGORY_LEGEND = { position: 'bottom', labels: { font: { family: 'Inter', size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'circle' } };
+
 let currentPage = 1;
 const PAGE_SIZE = 15;
 let lastPageData = { items: [], total: 0, page: 1, page_size: PAGE_SIZE };
@@ -78,23 +136,30 @@ async function loadAnalytics() {
     type: 'bar',
     data: {
       labels: data.monthly_volume.map(m => m.month.slice(2)), // "26-07"
-      datasets: [{ data: data.monthly_volume.map(m => m.count), backgroundColor: '#3F8489', borderRadius: 4 }]
+      datasets: [{ data: data.monthly_volume.map(m => m.count), backgroundColor: '#3F8489', borderRadius: 6, maxBarThickness: 34 }]
     },
     options: {
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      scales: { y: barScale('y'), x: { grid: { display: false }, border: { display: false }, ticks: { font: { family: 'Inter', size: 11 } } } }
     }
   });
 
   // Category distribution (doughnut)
   const catLabels = Object.keys(data.by_category);
+  const catTotal = catLabels.reduce((sum, c) => sum + data.by_category[c], 0);
   upsertChart('chart-category', {
     type: 'doughnut',
     data: {
       labels: catLabels,
-      datasets: [{ data: catLabels.map(c => data.by_category[c]), backgroundColor: CATEGORY_COLORS }]
+      datasets: [{ data: catLabels.map(c => data.by_category[c]), backgroundColor: CATEGORY_COLORS, borderColor: '#FFFFFF', borderWidth: 3 }]
     },
-    options: { plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter' } } } } }
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: CATEGORY_LEGEND,
+        centerText: { display: true, value: catTotal, label: 'Total' },
+      },
+    },
   });
 
   // Priority distribution (bar, ordered Low/Medium/High)
@@ -106,25 +171,33 @@ async function loadAnalytics() {
       datasets: [{
         data: priOrder.map(p => data.by_priority[p] || 0),
         backgroundColor: priOrder.map(p => PRIORITY_COLORS[p]),
-        borderRadius: 4
+        borderRadius: 6,
+        maxBarThickness: 26,
       }]
     },
     options: {
       indexAxis: 'y',
       plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+      scales: { x: barScale('x'), y: { grid: { display: false }, border: { display: false }, ticks: { font: { family: 'Inter', size: 12, weight: '500' } } } }
     }
   });
 
   // Status distribution (doughnut)
   const statusLabels = Object.keys(data.by_status);
+  const statusTotal = statusLabels.reduce((sum, s) => sum + data.by_status[s], 0);
   upsertChart('chart-status', {
     type: 'doughnut',
     data: {
       labels: statusLabels,
-      datasets: [{ data: statusLabels.map(s => data.by_status[s]), backgroundColor: statusLabels.map(s => STATUS_COLORS[s] || '#8695A4') }]
+      datasets: [{ data: statusLabels.map(s => data.by_status[s]), backgroundColor: statusLabels.map(s => STATUS_COLORS[s] || '#8695A4'), borderColor: '#FFFFFF', borderWidth: 3 }]
     },
-    options: { plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter' } } } } }
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: CATEGORY_LEGEND,
+        centerText: { display: true, value: statusTotal, label: 'Total' },
+      },
+    },
   });
 }
 

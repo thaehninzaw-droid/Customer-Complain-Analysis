@@ -29,6 +29,12 @@ this file is just the *what* and *what's next*.
 | Real MongoDB Atlas / Gemini / Qdrant / deployment | ❌ Still blocked - **not a missing-credential problem, a network problem**: this session's sandbox can only reach PyPI/npm/GitHub (confirmed via direct test, `x-deny-reason: host_not_allowed` on MongoDB Atlas, the Gemini API, Qdrant Cloud, and Render). See `docs/DECISIONS.md` #20 and the note below. |
 | Junior-proposed "activities" feature (`Myactivities.zip`) | ✅ Evaluated - already exists in Loopline, more completely (real ML classification, real status workflow, real auth/data isolation vs. the prototype's plaintext-password/no-isolation/always-"Pending" version). No new feature needed. Two small hardening ideas borrowed and **implemented**: server-side complaint length/city validation, and a `GET /cities` endpoint. See `docs/DECISIONS.md` #21/#22. |
 | Junior-friendly step-by-step setup guide | ✅ Done - `docs/GETTING_STARTED.md`, assumes zero prior familiarity (not even that Python is installed). See `docs/DECISIONS.md` #21. |
+| Ticket numbers "only showing 1, 2, 3" | ✅ Investigated - not a real numbering bug (confirmed `app/tickets.py` + both complaint-creation endpoints correctly start at 100001). Root cause was a missing `min` attribute on the admin chatbot's ticket-number input. Fixed. See `docs/DECISIONS.md` #24. |
+| Which dataset trains the ML models | ✅ Clarified - `comcast_complaints.csv` (real Kaggle data), confirmed via the training scripts' own fallback order + saved metrics. `synthetic_complaints.csv` is an unused dev-only stand-in. See `docs/DECISIONS.md` #24. |
+| Gemini `embedContent` 400 error | ⚠️ Likely fixed, **not verified against the live API** (no network path to Gemini from any sandbox this project has used). Missing `"model"` field added to `embed_text()`'s body; error messages now surface Google's actual response body instead of a generic status line, so if it still fails the real reason will show. See `docs/DECISIONS.md` #24. |
+| Analytics dashboard visual polish | ✅ Done - Chart.js styling (gridlines, tooltips, typography) brought in line with the rest of the app's design tokens, plus a doughnut center-total signature touch. Verified via syntax check + a standalone preview file (not part of the repo). Not checked inside a real running browser session. See `docs/DECISIONS.md` #24. |
+| Switch to Comcast_Cleaned.csv (2025 dates, Complaint_Clean col) | ✅ Done - `backend/data/comcast_complaints.csv` replaced with the cleaned version (same 2224 rows, ISO dates, extra `Complaint_Clean` column). Both models retrained: 93.0%/100% accuracy unchanged. 103/103 tests passing. See `docs/DECISIONS.md` #25. |
+| RAG architecture clarified for junior team | ✅ Documented - RAG uses `data/knowledge_base/` SOP docs (Markdown or PDF), not the training datasets. The two datasets train the ML models only. See `docs/DECISIONS.md` #25 and `docs/RAG_CHATBOT.md`. |
 
 ## A hard constraint discovered this session (read before attempting steps 1-3 below)
 
@@ -104,7 +110,7 @@ the reasoning under each step, and HANDOFF.md for the full context.
   real XGBoost path works~~ **Confirmed via CI** - see
   `docs/TESTING.md`.
 - Resolve the Billing/Financial category overlap (still an open
-  question - see `docs/DECISIONS.md`'s "Open questions" section).
+  question - see `docs/DECISIONS.md`'s "Not done yet" section).
 - Get the actual thesis rubric and check this against it directly,
   rather than against a best-guess of "needs an algorithm, data
   analysis, and a recommendation."
