@@ -9,54 +9,34 @@ Usage:
     python -m data.load_dataset path/to/comcast_complaints.csv
     python -m data.load_dataset path/to/comcast_complaints.csv --demo-shift-dates
 
-Expected columns (from the original Kaggle dataset):
+Expected columns (Comcast_Cleaned.csv - the active dataset as of
+docs/DECISIONS.md #25):
     Ticket #, Customer Complaint, Date, Date_month_year, Time,
     Received Via, City, State, Zip code, Status,
-    Filing on Behalf of Someone
+    Filing on Behalf of Someone, Complaint_Clean
 
 Only "Customer Complaint" is required - everything else is optional
 and mapped onto the app's own field names (ticket_no, date_month_year,
-etc.) where available. Historical rows get user_id = 0 (no signed-up
-customer filed them).
+etc.) where available. Complaint_Clean (pre-lowercased/stripped text
+added during cleaning) is used for ML training if present; the loader
+itself still uses "Customer Complaint" so the stored complaint text
+is the human-readable original. Historical rows get user_id = 0.
 
-Works unchanged against the SYNTHETIC dataset (data/generate_synthetic_
-dataset.py) or the real Kaggle CSV - same column names either way (see
-docs/ALGORITHMS.md) - but see the two normalization steps below, both
-found by actually running this against the real downloaded dataset
-rather than assumed to be unnecessary:
+DATE FORMAT: Comcast_Cleaned.csv uses ISO "YYYY-MM-DD" in
+Date_month_year (e.g. "2025-04-22"), which is exactly what this app
+stores everywhere - no conversion needed. parse_date() handles both
+ISO and the original "DD-Mon-YY" format so this loader works against
+the old raw CSV too. The "Date" column is NaN in the cleaned file -
+the loader uses "Date_month_year" as primary source.
 
-1. DATE FORMAT: the real CSV's "Date" column is "DD-MM-YY"
-   (e.g. "22-04-15" = 22 April 2015) - but this app's own
-   `date_month_year` field is stored as "YYYY-MM-DD" everywhere else
-   (see app/main.py's create_complaint). app/analytics.py parses
-   `date_month_year` as `s[0:4]` for year / `s[5:7]` for month to build
-   the monthly-volume chart - fed the raw "22-04-15" directly, EVERY
-   row from a real import would silently fail that parse (caught by a
-   try/except, so nothing crashes - it would just make the monthly
-   volume chart show zero historical data, which defeats the point of
-   loading history in the first place). Converted below.
+STATUS VOCABULARY: the CSV uses "Solved"/"Open" instead of this
+app's "Resolved"/"Pending" - mapped below so a single, mixed-source
+complaints collection has one consistent vocabulary.
 
-2. STATUS VOCABULARY: the real CSV uses "Solved"/"Open" instead of
-   this app's "Resolved"/"Pending" - mapped below so a single, mixed-
-   source complaints collection has one consistent status vocabulary
-   (the alternative - teaching every place that checks "is this
-   resolved" about a second set of synonyms - is worse; see
-   docs/ALGORITHMS.md).
-
-The BOM at the start of the real CSV's header row (a Kaggle/Excel
-export artifact) is handled by the utf-8-sig encoding below - it only
-ever corrupted the "Ticket #" column's key in practice, which this
-loader doesn't read anyway (fresh sequential ticket numbers are always
-generated instead), but utf-8-sig is the correct fix regardless.
-
---demo-shift-dates (optional): shifts every row's date forward by a
-fixed number of days so the most recent complaint in the dataset lands
-on today - see DECISIONS.md #19 for the full reasoning. Off by default.
-The real dataset file on disk is never modified by this flag; it only
-affects what gets written into whichever database this script targets.
-Never cite demo-shifted dates as real historical data - the true dates
-are 2015, see docs/ALGORITHMS.md for the actual analysis period.
+The BOM at the start of the CSV header (a Kaggle/Excel export
+artifact) is handled by utf-8-sig encoding below.
 """
+
 import csv
 import sys
 from datetime import date, datetime, timedelta

@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-08-03T10:43:26.523757+00:00",
+  "trained_at": "2026-08-05T11:35:17.333761+00:00",
   "dataset_path": "/home/claude/work/loopline/backend/data/comcast_complaints.csv",
   "dataset_is_synthetic": false,
   "n_rows_total": 2224,

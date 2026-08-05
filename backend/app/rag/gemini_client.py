@@ -12,8 +12,18 @@ throughout - see app/classify.py).
 Endpoints and request/response shapes below were verified against the
 live Gemini API docs (ai.google.dev/gemini-api/docs) as of July 2026 -
 see docs/RAG_CHATBOT.md for the citations. This code has NOT been run
-against the real API (no internet access in the dev sandbox that built
-it) - see docs/TESTING.md for what's verified vs. not.
+against the real API from inside a dev/build sandbox (none used to
+build or extend this project have had network access to
+generativelanguage.googleapis.com specifically - confirmed directly,
+not assumed, each time - see docs/TESTING.md and docs/DECISIONS.md
+#20). A real deployment DID hit this code for real and got a 400 on
+embedContent - see docs/DECISIONS.md #24 for the fix (embed_text() was
+missing the "model" field in its body that embed_texts() already had,
+and that every official example includes) and for why the error
+message itself wasn't useful for diagnosing this the first time
+(str(HTTPError) doesn't include the response body - now fixed via
+_raise_with_body() below, so next time this happens the actual reason
+from Google shows up directly in the admin chatbot UI).
 
 Model choice: defaults to `gemini-flash-latest`, a Google-maintained
 alias that always points at the current GA Flash model (gemini-3.5-flash
@@ -48,6 +58,24 @@ def _headers():
     return {"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
 
 
+def _raise_with_body(e: requests.RequestException, action: str):
+    """Wraps a requests error, including the actual response body if
+    there is one - Google's error responses put the real reason
+    (INVALID_ARGUMENT vs. FAILED_PRECONDITION vs. PERMISSION_DENIED,
+    etc.) in the JSON body, which `str(HTTPError)` alone does NOT
+    include (it only gives the status line, e.g. "400 Client Error:
+    Bad Request for url: ..."). Without this, a 400 with a billing/
+    region problem and a 400 with a malformed request look identical
+    in the admin chatbot UI and in logs - see docs/DECISIONS.md #24."""
+    body = ""
+    if getattr(e, "response", None) is not None:
+        try:
+            body = f" | response body: {e.response.text}"
+        except Exception:
+            pass
+    raise GeminiError(f"Gemini {action} request failed: {e}{body}") from e
+
+
 def generate_text(prompt: str, system_instruction: str = None) -> str:
     """Calls :generateContent and returns the plain text response."""
     if not is_configured():
@@ -71,7 +99,7 @@ def generate_text(prompt: str, system_instruction: str = None) -> str:
             raise GeminiError(f"Empty text in Gemini response: {data}")
         return text
     except requests.RequestException as e:
-        raise GeminiError(f"Gemini generateContent request failed: {e}") from e
+        _raise_with_body(e, "generateContent")
 
 
 def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
@@ -85,6 +113,14 @@ def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
 
     url = f"{BASE_URL}/{GEMINI_EMBEDDING_MODEL}:embedContent"
     body = {
+        # Every official example (curl, Postman, the OpenClaw issue
+        # confirming a working response) includes "model" inside the
+        # body too, even though it's already in the URL path - this
+        # function used to omit it while embed_texts() (below) always
+        # included it per-item. That inconsistency is the most likely
+        # cause of the real 400 this was hit with - see
+        # docs/DECISIONS.md #24 for the sources checked.
+        "model": f"models/{GEMINI_EMBEDDING_MODEL}",
         "content": {"parts": [{"text": text}]},
         "taskType": task_type,
         "outputDimensionality": GEMINI_EMBEDDING_DIM,
@@ -98,7 +134,7 @@ def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
             raise GeminiError(f"No embedding values in Gemini response: {data}")
         return values
     except requests.RequestException as e:
-        raise GeminiError(f"Gemini embedContent request failed: {e}") from e
+        _raise_with_body(e, "embedContent")
 
 
 def embed_texts(texts: list, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
