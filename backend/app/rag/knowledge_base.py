@@ -12,10 +12,31 @@ uses pypdf (already in requirements.txt via the pdf skill's tooling).
 
 Run the indexer with:
     python -m app.rag.knowledge_base
-(requires GEMINI_API_KEY - see docs/RAG_CHATBOT.md)
+(requires GEMINI_API_KEY set in backend/.env - see docs/RAG_CHATBOT.md
+and docs/GETTING_STARTED.md Step 11)
 """
 import sys
 from pathlib import Path
+
+# Load .env BEFORE importing gemini_client/vector_store, which read
+# GEMINI_API_KEY and QDRANT_URL at import time via os.getenv().
+# Without this, running `python -m app.rag.knowledge_base` directly
+# from the command line finds no API key even if backend/.env is
+# properly configured - the dotenv loader in app/db.py only fires when
+# the FastAPI server starts, not when standalone scripts are run.
+# See docs/DECISIONS.md #26.
+_this_dir = Path(__file__).resolve().parent
+for _candidate in [
+    _this_dir.parent.parent / ".env",        # backend/.env (most likely)
+    _this_dir.parent.parent.parent / ".env",  # repo-root/.env (fallback)
+]:
+    if _candidate.exists():
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(dotenv_path=_candidate)
+        except ImportError:
+            pass
+        break
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 

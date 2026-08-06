@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .admin_seed import ensure_admin_seeded
+from .dataset_seed import ensure_dataset_seeded
 from .analytics import compute_analytics
 from .auth import AuthError, build_new_user, next_user_id, validate_signup
 from .categories import CATEGORIES
@@ -58,6 +59,13 @@ def _seed_admin_on_startup():
     separate manual step. Idempotent against real MongoDB too - see
     app/admin_seed.py."""
     ensure_admin_seeded()
+    # Auto-seed the complaints collection from the Comcast dataset CSV
+    # on first startup so the admin dashboard shows real analytics
+    # immediately, without any separate data-loading step. Only runs
+    # against the in-memory DB (no MONGODB_URI) and only when the
+    # collection is empty. See app/dataset_seed.py and
+    # docs/DECISIONS.md #26.
+    ensure_dataset_seeded()
 
 
 # ------------------------------------------------------- auth dependencies ----

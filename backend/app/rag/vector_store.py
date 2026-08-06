@@ -67,6 +67,16 @@ def _qdrant_search(vector: list, top_k: int):
         url, headers=_headers(), timeout=TIMEOUT_SECONDS,
         json={"vector": vector, "limit": top_k, "with_payload": True},
     )
+    if resp.status_code == 404:
+        # Collection doesn't exist = knowledge base was never indexed.
+        # Give an actionable message so the admin (and any error log)
+        # knows exactly what to run, rather than a raw Qdrant JSON blob.
+        raise VectorStoreError(
+            f"Knowledge base not indexed yet — run "
+            f"`python -m app.rag.knowledge_base` from the backend/ "
+            f"folder (needs GEMINI_API_KEY in .env). "
+            f"See docs/GETTING_STARTED.md Step 11 or docs/RAG_CHATBOT.md."
+        )
     if resp.status_code != 200:
         raise VectorStoreError(f"Qdrant search failed: {resp.status_code} {resp.text}")
     return [
