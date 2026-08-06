@@ -469,8 +469,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 function buildTimeSelectOptions() {
   const hourSel = document.getElementById('f-hour');
   const minSel = document.getElementById('f-minute');
-  const secSel = document.getElementById('f-second');
-  if (!hourSel || !minSel || !secSel) return;
+  if (!hourSel || !minSel) return;
   if (hourSel.options.length === 0) {
     for (let h = 1; h <= 12; h++) {
       const opt = document.createElement('option');
@@ -487,29 +486,19 @@ function buildTimeSelectOptions() {
       minSel.appendChild(opt);
     }
   }
-  if (secSel.options.length === 0) {
-    for (let s = 0; s < 60; s++) {
-      const opt = document.createElement('option');
-      opt.value = pad2(s);
-      opt.textContent = pad2(s);
-      secSel.appendChild(opt);
-    }
-  }
 }
 function updateTimePreview() {
   const preview = document.getElementById('time-preview');
   if (!preview) return;
   const hourSel = document.getElementById('f-hour');
   const minSel = document.getElementById('f-minute');
-  const secSel = document.getElementById('f-second');
   const ampmSel = document.getElementById('f-ampm');
-  if (!hourSel || !minSel || !secSel || !ampmSel) return;
+  if (!hourSel || !minSel || !ampmSel) return;
   const h = hourSel.value;
   const m = minSel.value;
-  const s = secSel.value;
   const a = ampmSel.value;
-  if (!h || !m || !s || !a) return;
-  preview.textContent = `${parseInt(h, 10)}:${m}:${s} ${a}`;
+  if (!h || !m || !a) return;
+  preview.textContent = `${parseInt(h, 10)}:${m} ${a}`;
 }
 
 function updateComplaintStats() {
@@ -741,7 +730,7 @@ function showFieldError(id, msg) {
   if (id === 'err-complaint') setFieldValid('f-complaint', false);
   if (id === 'err-date') setFieldValid('f-date', false);
   if (id === 'err-time') {
-    ['f-hour','f-minute','f-second','f-ampm'].forEach(fid => setFieldValid(fid, false));
+    ['f-hour','f-minute','f-ampm'].forEach(fid => setFieldValid(fid, false));
   }
   if (id === 'err-city') setFieldValid('city-search', false);
 }
@@ -753,7 +742,7 @@ function clearFieldError(id) {
   if (id === 'err-complaint') setFieldValid('f-complaint', true);
   if (id === 'err-date') setFieldValid('f-date', true);
   if (id === 'err-time') {
-    ['f-hour','f-minute','f-second','f-ampm'].forEach(fid => setFieldValid(fid, true));
+    ['f-hour','f-minute','f-ampm'].forEach(fid => setFieldValid(fid, true));
   }
   if (id === 'err-city') setFieldValid('city-search', true);
 }
@@ -831,14 +820,12 @@ function openComplaintModal() {
 
   const hourSel = document.getElementById('f-hour');
   const minSel = document.getElementById('f-minute');
-  const secSel = document.getElementById('f-second');
   const ampmSel = document.getElementById('f-ampm');
   let h12 = yg.hh % 12;
   if (h12 === 0) h12 = 12;
   const suffix = yg.hh >= 12 ? 'PM' : 'AM';
   if (hourSel) hourSel.value = pad2(h12);
   if (minSel) minSel.value = pad2(yg.mm);
-  if (secSel) secSel.value = pad2(yg.ss);
   if (ampmSel) ampmSel.value = suffix;
 
   updateTimePreview();
@@ -961,7 +948,7 @@ function wireActivitiesPage() {
     });
   }
 
-  ['f-hour','f-minute','f-second','f-ampm'].forEach(id => {
+  ['f-hour','f-minute','f-ampm'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => {
       updateTimePreview();
@@ -1005,16 +992,12 @@ function wireActivitiesPage() {
 
       ['err-complaint','err-date','err-time','err-city'].forEach(clearFieldError);
 
-      // category is optional now - leave it blank and the backend's
-      // Algorithm 1 auto-classifies it (see SRS: "Customer complain input
-      // ... category ခွဲပေးမယ်" / auto-categorization). Still send it if
-      // the customer picked one, so a manual override keeps working too.
       const category = document.getElementById('f-category').value || null;
       const complaint = document.getElementById('f-complaint').value.trim();
       const date_month_year = document.getElementById('f-date').value;
       const hour12 = document.getElementById('f-hour').value;
       const minute = document.getElementById('f-minute').value;
-      const second = document.getElementById('f-second').value;
+      const second = '00'; // seconds removed from UI; backend stamps real time
       const ampm = document.getElementById('f-ampm').value;
       const city = (document.getElementById('f-city').value || '').trim();
       const state = (document.getElementById('f-state').value || '').trim();

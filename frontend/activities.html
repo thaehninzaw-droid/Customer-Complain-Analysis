@@ -206,31 +206,28 @@
         </div>
 
         <div class="field">
-          <label for="f-date">Date</label>
-          <input id="f-date" type="date" required>
-          <p class="field-error" id="err-date"></p>
-        </div>
-
-        <div class="field">
-          <label>Time</label>
-          <div class="time-picker">
-            <select id="f-hour" required>
-              <!-- Hours 01-12 inserted by JS -->
-            </select>
-            <span class="time-colon">:</span>
-            <select id="f-minute" required>
-              <!-- Minutes 00-59 inserted by JS -->
-            </select>
-            <span class="time-colon">:</span>
-            <select id="f-second" required>
-              <!-- Seconds 00-59 inserted by JS -->
-            </select>
-            <select id="f-ampm" required>
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
+          <label>Date &amp; Time of Incident</label>
+          <div class="datetime-row">
+            <input id="f-date" type="date" required aria-label="Date of incident">
+            <div class="time-picker">
+              <select id="f-hour" aria-label="Hour" required>
+                <!-- Hours 01-12 inserted by JS -->
+              </select>
+              <span class="time-colon">:</span>
+              <select id="f-minute" aria-label="Minute" required>
+                <!-- Minutes 00-59 inserted by JS -->
+              </select>
+              <select id="f-ampm" aria-label="AM or PM" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           </div>
-          <p class="form-note" id="time-preview" style="margin:6px 0 0;">5:53:18 PM</p>
+          <p class="form-note" id="time-preview" style="margin:6px 0 0;"></p>
+          <p class="form-note" style="margin:2px 0 0; color: var(--ink-faint);">
+            When did this issue occur? Auto-set to now — adjust if it happened earlier.
+          </p>
+          <p class="field-error" id="err-date"></p>
           <p class="field-error" id="err-time"></p>
         </div>
 

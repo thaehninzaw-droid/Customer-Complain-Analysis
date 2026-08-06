@@ -1022,6 +1022,26 @@ footer {
   align-items: center;
   gap: 6px;
 }
+/* Combined date + time on one row */
+.datetime-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.datetime-row input[type="date"] {
+  flex: 1 1 140px;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.datetime-row .time-picker {
+  flex: 1 1 160px;
+}
 .time-picker select {
   flex: 1;
   min-width: 0;
