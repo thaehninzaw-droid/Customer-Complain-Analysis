@@ -376,6 +376,52 @@ the server or `curl`/browser to eyeball it → write or update a test →
 
 ---
 
+## Step 11: Enable the AI chatbot (optional — needs real API keys)
+
+The admin chatbot works in two modes:
+- **Without API keys** (default): gives rule-based template answers and
+  says so honestly in the UI — fully usable, no setup needed.
+- **With API keys**: Gemini generates real answers grounded in the SOP
+  documents in `data/knowledge_base/` via Qdrant vector search (RAG).
+
+To enable the real chatbot:
+
+**1. Get your API keys** (one-time):
+- `GEMINI_API_KEY` → [aistudio.google.com](https://aistudio.google.com) → Get API key
+- `QDRANT_URL` + `QDRANT_API_KEY` → [cloud.qdrant.io](https://cloud.qdrant.io) (free tier available) or run Qdrant locally: `docker run -p 6333:6333 qdrant/qdrant`
+
+**2. Add them to `backend/.env`:**
+```
+GEMINI_API_KEY=your_gemini_key_here
+QDRANT_URL=https://your-cluster.qdrant.io
+QDRANT_API_KEY=your_qdrant_key_here
+```
+
+**3. Index the knowledge base** (run once, and any time SOP docs change):
+```bash
+cd backend
+python -m app.rag.knowledge_base
+```
+This reads every `.md`/`.pdf` file in `data/knowledge_base/`, embeds
+each chunk via Gemini, and stores them in Qdrant. You'll see:
+```
+[knowledge_base] Indexed 47 chunks from 5 documents (Qdrant).
+```
+
+**4. Restart the server** — the chatbot will now use real Gemini answers.
+
+**Important:** Step 3 (`python -m app.rag.knowledge_base`) must be run
+from inside the `backend/` folder with the `venv` active — it needs
+`GEMINI_API_KEY` from your `.env` file and it needs to reach
+`generativelanguage.googleapis.com`. Run it again any time you add or
+edit files in `data/knowledge_base/`.
+
+**If the chatbot shows "Knowledge base not indexed yet":** you have
+Qdrant connected but haven't run Step 3 yet — run it and the error
+goes away.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |

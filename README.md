@@ -64,6 +64,7 @@ exactly what that means and what to check first). Full detail in
 | `docs/ARCHITECTURE.md` | System overview, why it's shaped this way |
 | `docs/ALGORITHMS.md` | Both ML algorithms - methodology, bugs found & fixed, how to retrain |
 | `docs/RAG_CHATBOT.md` | Gemini + Qdrant setup, architecture, API shapes used |
+| `docs/VISUALIZATIONS.md` | Every chart and graph in the admin dashboard — what it shows, data source, and how to get data appearing |
 | `docs/ADMIN_AUTH.md` | Roles, security model, how admin accounts get created |
 | `docs/API_REFERENCE.md` | Every endpoint, request/response shapes |
 | `docs/TESTING.md` | What's verified vs. reviewed-but-not-run, and why |

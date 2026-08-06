@@ -903,6 +903,95 @@ Customers never see the chatbot at all — it's admin-only, as confirmed.
 
 ---
 
+## Decision 26: Five live-run issues fixed - RAG .env loading, Qdrant 404 message, dashboard empty on startup, time picker seconds, VISUALIZATIONS.md
+
+**Context:** After actually running the app locally, five more issues
+surfaced all at once. Addressed in a single session.
+
+**1. `python -m app.rag.knowledge_base` said "GEMINI_API_KEY not set"
+even though `.env` had it.**
+
+Root cause: `load_dotenv()` is only called in `app/db.py`, which gets
+imported when the FastAPI server starts. Standalone scripts bypass that
+chain entirely - `os.getenv()` in `gemini_client.py` reads whatever
+the shell environment has, which does NOT include anything in `.env`
+unless something loaded it first. Fixed by adding a `.env` search-and-
+load block at the top of `app/rag/knowledge_base.py`, before any
+`import` that calls `os.getenv()` (imports are where the value gets
+captured into module-level constants). The search tries
+`backend/.env` first (most likely path), then the repo root. Uses a
+try/except around the dotenv import in case someone runs this on a
+system that doesn't have `python-dotenv` installed somehow (though it's
+in requirements.txt).
+
+**2. Qdrant "Collection doesn't exist" 404 showed a raw JSON blob in
+the admin chatbot UI.**
+
+The improved error-body surfacing from Decision 24 (`_raise_with_body`)
+made the Qdrant 404 body visible - good, it confirmed the diagnosis.
+But the message was still a raw `{"status":{"error":"Not found:
+Collection loopline_sop_chunks doesn't exist!"...}}` blob that told an
+admin nothing about what to do. Fixed in `vector_store.py`'s
+`_qdrant_search()` by checking `resp.status_code == 404` specifically
+before the generic error case, and raising a `VectorStoreError` with an
+actionable English message ("Knowledge base not indexed yet — run
+`python -m app.rag.knowledge_base` from backend/ with GEMINI_API_KEY
+in .env. See docs/GETTING_STARTED.md Step 11 or docs/RAG_CHATBOT.md.")
+
+**3. Admin dashboard showed empty charts on first run (in-memory DB).**
+
+The in-memory database starts empty every time the server starts (by
+design - it's a dev convenience, not a persistent store). The admin
+seed (`ensure_admin_seeded()`) creates the admin account, but nothing
+created any complaint data, so the analytics endpoint returned empty
+counts and the four charts had nothing to render.
+
+Fixed by adding `app/dataset_seed.py` — `ensure_dataset_seeded()`
+called at startup immediately after `ensure_admin_seeded()`. It reads
+`comcast_complaints.csv`, classifies each complaint through Algorithms
+1 and 2 (same path as a real filed complaint), and inserts all 2224
+rows into the in-memory collection. Runs only when: (a) no `MONGODB_URI`
+is configured (real MongoDB is assumed to have data from a manual
+`load_dataset` run), and (b) the complaints collection is currently
+empty. Idempotent — never duplicates. One-time cost on first startup;
+subsequent startups are fast (the collection isn't empty anymore...
+but wait, it IS empty again because in-memory doesn't persist across
+restarts). This is a real consequence: every server restart re-seeds.
+That's acceptable because (a) it only happens in dev/in-memory mode,
+(b) the seeding completes in a few seconds, and (c) the alternative
+(a persistent dev database) is significantly more setup work. Logged
+plainly in the startup output:
+`[dataset_seed] Seeded 2224 complaints — dashboard analytics are now
+populated.`
+
+**4. Time picker showing hours, minutes, *seconds*, and AM/PM.**
+
+The "seconds" dropdown (0-59 in a dropdown) added no real value - for
+a complaint filing form "when did this happen," granularity beyond
+HH:MM is meaningless, and the backend ignores the frontend time anyway
+(it stamps the real server time on submission, as noted in a comment
+already in the submit handler). Removed the `f-second` `<select>` from
+`activities.html`, removed it from `buildTimeSelectOptions()` and
+`updateTimePreview()` in `script.js`, and hardcoded `second = '00'` in
+the submit handler so the validation function still receives a valid
+value without any code change to `validateDateTimeYangon()`. Also merged
+the Date and Time fields into a single visual row (`datetime-row` CSS
+class) and relabeled the field to "Date & Time of Incident — Auto-set
+to now, adjust if it happened earlier." This explains the purpose:
+the customer is recording *when the incident happened*, not when they
+filed it (the server timestamps filing separately).
+
+**5. `docs/VISUALIZATIONS.md` added for junior team.**
+
+Khin Sis Thway asked (in Burmese): "What charts and graphs are shown
+for visualization? Right now there's no data so we can't see them."
+Two separate answers needed: (a) what the charts ARE, and (b) why
+there's no data and how to get data appearing. Both answered in the new
+doc. Also added to `README.md`'s documentation table and linked from
+`docs/GETTING_STARTED.md` Step 9's codebase map.
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
