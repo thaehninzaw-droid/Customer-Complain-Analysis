@@ -7,7 +7,19 @@ function addChatMessage(text, role, meta) {
   const history = document.getElementById('chat-history');
   const el = document.createElement('div');
   el.className = `admin-chat-msg ${role}`;
-  el.textContent = text;
+
+  if (role === 'bot' && typeof marked !== 'undefined') {
+    // Bot responses come from Gemini and may contain markdown
+    // (bold, numbered lists, inline code, etc.) - render as HTML.
+    // User messages use textContent (never innerHTML) — XSS guard:
+    // a customer complaint text should never be interpreted as markup.
+    const mdContainer = document.createElement('div');
+    mdContainer.className = 'chat-md';
+    mdContainer.innerHTML = marked.parse(text || '');
+    el.appendChild(mdContainer);
+  } else {
+    el.textContent = text;
+  }
 
   if (meta && role === 'bot') {
     if (meta.sources && meta.sources.length) {

@@ -34,7 +34,13 @@ if (typeof Chart !== 'undefined') {
     afterDraw(chart) {
       const opts = chart.config.options?.plugins?.centerText;
       if (!opts || !opts.display) return;
-      const { ctx, chartArea: { left, right, top, bottom } } = chart;
+      // chartArea is undefined until Chart.js has completed layout;
+      // during the very first afterDraw call (before first paint) it
+      // can be missing. Guard here so a thrown TypeError doesn't kill
+      // the draw cycle for ALL four charts - see docs/DECISIONS.md #26.
+      if (!chart.chartArea) return;
+      const { left, right, top, bottom } = chart.chartArea;
+      const { ctx } = chart;
       const centerX = (left + right) / 2;
       const centerY = (top + bottom) / 2;
       ctx.save();
