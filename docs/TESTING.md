@@ -21,7 +21,14 @@ at the network level, not a credentials issue) - so the "⚠️ Still not
 runtime-executed anywhere" section below is unchanged and still
 accurate.
 
-**Update: server-side complaint validation + `GET /cities` added**
+**Update: Real Gemini + Qdrant confirmed working** (local test by the
+team). The admin AI chatbot returns real RAG-backed answers with
+`used_rag: true`. The `embedContent` body fix (Decision 24) resolved
+the 400 error. See `ROADMAP.md` for current status summary.
+
+The sections below about "⚠️ Still not runtime-executed anywhere" for
+Gemini/Qdrant are **now resolved**. MongoDB Atlas remains the only
+external service not yet tested against real infrastructure.
 (`docs/DECISIONS.md` #22) - the test suite grew from 83 to **103
 tests** (20 new: `tests/test_cities.py`, `tests/test_validation.py`,
 plus new integration tests in `tests/test_api.py`), all passing, and
