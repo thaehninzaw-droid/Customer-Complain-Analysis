@@ -10,31 +10,31 @@
                                     │
                  ┌──────────────────┼──────────────────┐
                  ▼                                     ▼
-     ┌───────────────────────┐          ┌───────────────────────────┐
-     │   Customer Portal      │          │      Admin Portal          │
-     │  login/signup/         │          │  admin-login.html          │
-     │  activities.html        │          │  admin-dashboard.html      │
-     │  (file/track complaints)│          │  admin-chatbot.html        │
-     └───────────┬─────────────┘          └────────────┬───────────────┘
+     ┌─────────────────────────┐          ┌───────────────────────────┐
+     │   Customer Portal       │          │      Admin Portal         │
+     │  login/signup/          │          │  admin-login.html         │
+     │  activities.html        │          │  admin-dashboard.html     │
+     │  (file/track complaints)│          │  admin-chatbot.html       │
+     └───────────┬─────────────┘          └────────────┬──────────────┘
                  │  fetch() + Bearer token              │  fetch() + Bearer token
                  ▼                                      ▼
      ┌─────────────────────────────────────────────────────────────────┐
-     │                     FastAPI backend (backend/app)                │
-     │                                                                    │
-     │  /auth/*         session-token auth (app/auth.py, sessions.py)    │
-     │  /complaints     Algorithm 1 + Algorithm 2 run here on submit     │
-     │  /admin/*        role-checked (get_current_admin_id)               │
-     │  /chatbot/*      RAG pipeline (app/rag/) or template fallback      │
-     └───────┬────────────────┬───────────────────┬──────────────────────┘
+     │                     FastAPI backend (backend/app)               │
+     │                                                                 │
+     │  /auth/*         session-token auth (app/auth.py, sessions.py)  │
+     │  /complaints     Algorithm 1 + Algorithm 2 run here on submit   │
+     │  /admin/*        role-checked (get_current_admin_id)            │
+     │  /chatbot/*      RAG pipeline (app/rag/) or template fallback   │
+     └───────┬────────────────┬───────────────────┬────────────────────┘
              │                │                   │
              ▼                ▼                   ▼
-   ┌──────────────────┐ ┌─────────────────┐ ┌────────────────────────┐
-   │ MongoDB Atlas     │ │  app/ml/         │ │  Gemini API + Qdrant    │
-   │ (or in-memory      │ │  Algorithm 1: TF-│ │  (or in-memory fallback │
-   │  fallback - db.py) │ │  IDF+LogReg      │ │  - app/rag/)            │
-   │                    │ │  Algorithm 2:    │ │                          │
-   │                    │ │  sentiment + GBT │ │                          │
-   └──────────────────┘ └─────────────────┘ └────────────────────────┘
+   ┌───────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
+   │ MongoDB Atlas     │ │  app/ml/        │ │  Gemini API + Qdrant    │
+   │ (or in-memory     │ │  Algorithm 1: TF│ │  (or in-memory fallback │
+   │  fallback - db.py)│ │  IDF+LogReg     │ │  - app/rag/)            │
+   │                   │ │  Algorithm 2:   │ │                         │
+   │                   │ │  sentiment + GBT│ │                         │
+   └───────────────────┘ └─────────────────┘ └─────────────────────────┘
 ```
 
 ## Why this shape
