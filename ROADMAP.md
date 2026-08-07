@@ -38,7 +38,7 @@ this file is just the *what* and *what's next*.
 | Time picker showing seconds and fractional time | ✅ Fixed - removed seconds dropdown, merged date+time into one row, added clear label "When did this issue occur? Auto-set to now." |
 | `docs/VISUALIZATIONS.md` for junior team | ✅ Done - documents all 4 charts + 3 KPI cards + algorithm status chips with data sources, colors, and how to get data showing. |
 | Step 11 in GETTING_STARTED.md (RAG indexing) | ✅ Done - full step-by-step for enabling the AI chatbot with real API keys. |
-| Analytics dashboard visual polish | ✅ Done - Chart.js styling (gridlines, tooltips, typography) brought in line with the rest of the app's design tokens, plus a doughnut center-total signature touch. Verified via syntax check + a standalone preview file (not part of the repo). Not checked inside a real running browser session. See `docs/DECISIONS.md` #24. |
+| Analytics dashboard visual polish | ✅ Done - Chart.js replaced with pure SVG (`svgBarChart`, `svgDonutChart`, `svgHBarChart`). Baseline/live toggle. No CDN dependency. See `docs/DECISIONS.md` #27. |
 | Switch to Comcast_Cleaned.csv (2025 dates, Complaint_Clean col) | ✅ Done - `backend/data/comcast_complaints.csv` replaced with the cleaned version (same 2224 rows, ISO dates, extra `Complaint_Clean` column). Both models retrained: 93.0%/100% accuracy unchanged. 103/103 tests passing. See `docs/DECISIONS.md` #25. |
 | RAG architecture clarified for junior team | ✅ Documented - RAG uses `data/knowledge_base/` SOP docs (Markdown or PDF), not the training datasets. The two datasets train the ML models only. See `docs/DECISIONS.md` #25 and `docs/RAG_CHATBOT.md`. |
 

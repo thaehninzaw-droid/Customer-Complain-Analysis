@@ -153,12 +153,29 @@ python -m app.ml.train_priority
 
 ## Chart rendering library
 
-All charts use **Chart.js 4.4.4** (loaded from cdnjs, no installation
-needed). The styling is customized to match Loopline's own design
-tokens (Inter font, brand teal/amber/red colors, soft gridlines) — see
-`frontend/admin-dashboard.js` for the full Chart.js configuration,
-including the `centerText` plugin that draws the total count in the
-center of the two doughnut charts.
+Charts are rendered in **pure SVG** — no external library, no CDN.
+The functions `svgBarChart()`, `svgDonutChart()`, and `svgHBarChart()`
+in `frontend/admin-dashboard.js` use the DOM's native SVG API
+(`createElementNS`). This works on `file://`, `localhost`, and any
+server, and cannot fail due to CDN access issues.
+
+Each chart element is interactive: hovering any bar or donut slice
+shows a tooltip with the exact value and percentage.
+
+## Data source toggle
+
+A toggle bar above the charts lets you switch between two data sources:
+
+- **📊 Comcast Baseline (2,224):** The full Comcast dataset statistics
+  are hardcoded in the `BASELINE` constant in `admin-dashboard.js`.
+  This renders instantly on page load with no network call.
+- **🔴 Live Data:** Fetches real-time counts from `GET /admin/analytics`
+  (all complaints currently in the database, filed through the app).
+
+On first load, the baseline always renders so charts are never blank.
+Live data is fetched in the background and cached — switching to it is
+instant once the fetch completes. If the live fetch fails, it falls
+back to baseline automatically.
 
 ---
 

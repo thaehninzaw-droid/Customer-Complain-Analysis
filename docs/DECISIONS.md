@@ -992,6 +992,62 @@ doc. Also added to `README.md`'s documentation table and linked from
 
 ---
 
+## Decision 27: Team replaced Chart.js dashboard with pure-SVG implementation featuring a baseline/live toggle
+
+**Context:** Chart.js CDN (`cdnjs.cloudflare.com`) was blocked in the
+team's network environment (Myanmar), causing a `ReferenceError: Chart
+is not defined` that silently killed all four charts. Multiple attempts
+to work around Chart.js (plugin null-checks, CDN removal, SVG
+rewrites) were interrupted by session/time limits. The team fixed it
+themselves and submitted the working files. Their version was adopted
+as-is into the repository.
+
+**What the team built:**
+
+1. **Pure SVG chart renderers (no external library, no CDN):**
+   `svgBarChart()`, `svgDonutChart()`, `svgHBarChart()` — all written
+   against the DOM's `createElementNS` SVG API. Works on `file://`,
+   `localhost`, and any server. Cannot fail due to CDN issues.
+   Interactive tooltips (`mouseenter`/`mousemove`/`mouseleave`) on
+   every bar and donut slice.
+
+2. **Data-source toggle UI:** A pill toggle bar above the charts lets
+   the admin switch between "📊 Comcast Baseline (2,224)" and
+   "🔴 Live Data" at any time. On page load, the baseline renders
+   immediately (no network wait), then live data is fetched in the
+   background and cached so the toggle is instant. If the live fetch
+   fails, it falls back to baseline with a toast.
+
+3. **Hardcoded baseline in `BASELINE` constant:** Comcast dataset
+   statistics (2,224 complaints, 12 months of 2025 volume,
+   by_category / by_priority / by_status breakdowns) are embedded
+   directly in the JS so charts always show real, meaningful data
+   regardless of backend connectivity. Note: the baseline's monthly
+   volume uses an evenly-distributed approximation (215 complaints/mo)
+   rather than the actual per-month counts (which have a large June
+   2025 spike at 1,046). This is intentional — the team chose a
+   presentation-friendly distribution.
+
+4. **`loadAnalytics()` flow:** renders baseline synchronously → fires
+   live fetch in background → if `_currentSource === 'live'` when the
+   fetch resolves, applies live data then; otherwise caches it for
+   when the user toggles.
+
+**One bug fixed during adoption:** `m.month.slice(3)` worked for the
+BASELINE's `'25-01'` format but broke for the live API's `'2025-01'`
+format (would show `'5-01'` as the month label). Changed to
+`m.month.slice(-2)` which correctly returns `'01'` for both formats.
+
+**CSS:** All new CSS classes (`.svg-chart-host`, `.donut-wrap`,
+`.ds-toggle-bar`, etc.) added to `frontend/style.css` so they work
+in all contexts. The HTML's inline `<style>` block remains as a
+harmless fallback.
+
+**Verified:** `node --check` syntax clean, `pytest` 103/103,
+all HTML pages parse without errors.
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
