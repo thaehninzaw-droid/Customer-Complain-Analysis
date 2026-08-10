@@ -4,7 +4,19 @@ from app.rag import vector_store
 
 
 @pytest.fixture(autouse=True)
-def _clean_store():
+def _isolate_memory_store(monkeypatch):
+    """Force in-memory store for every vector_store test.
+
+    QDRANT_URL is read at import time into a module-level constant, so
+    monkeypatching os.environ after import has no effect. We patch the
+    module-level constant directly instead. This means these tests
+    always run against the in-memory fallback regardless of whether a
+    real QDRANT_URL is set in .env - which is correct: the test vectors
+    are 3-dimensional while a real Qdrant collection (created for
+    Gemini embeddings) is 768-dimensional. Mixing them causes a
+    dimension-mismatch error from Qdrant. See docs/DECISIONS.md #27.
+    """
+    monkeypatch.setattr(vector_store, "QDRANT_URL", None)
     vector_store.reset_memory_store()
     yield
     vector_store.reset_memory_store()

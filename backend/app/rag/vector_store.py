@@ -29,10 +29,13 @@ class VectorStoreError(Exception):
 
 
 def is_configured() -> bool:
-    return bool(QDRANT_URL)
+    # Read the module-level QDRANT_URL attribute rather than the captured
+    # os.getenv() value - this lets tests monkeypatch vector_store.QDRANT_URL
+    # to None to force the in-memory fallback without having to restart the
+    # process. See tests/test_vector_store.py and docs/DECISIONS.md #27.
+    import sys
+    return bool(sys.modules[__name__].QDRANT_URL)
 
-
-# --------------------------------------------------------------- Qdrant ----
 
 def _headers():
     headers = {"Content-Type": "application/json"}
