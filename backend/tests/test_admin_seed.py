@@ -23,5 +23,5 @@ def test_ensure_admin_seeded_is_idempotent(monkeypatch):
     second_id = ensure_admin_seeded()
 
     assert first_id == second_id
-    matches = get_collection("users").find({"email": "idempotent-admin@loopline.io"})
+    matches = list(get_collection("users").find({"email": "idempotent-admin@loopline.io"}))
     assert len(matches) == 1
