@@ -1591,6 +1591,24 @@ footer {
   cursor: pointer;
 }
 
+/* Baseline (read-only) table rows — historical CSV data, not editable */
+.baseline-row td { opacity: 0.9; }
+.inline-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  padding: 4px 8px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink-soft);
+}
+.inline-label.pending   { background: var(--amber-tint); color: #92600a; border-color: var(--amber); }
+.inline-label.resolved  { background: var(--teal-tint);  color: var(--teal-dark); border-color: var(--teal); }
+.inline-label.priority-low    { background: #e6f3f3; color: #2C5F63; border-color: #b3d4d5; }
+.inline-label.priority-medium { background: var(--amber-tint); color: #92600a; border-color: var(--amber); }
+.inline-label.priority-high   { background: var(--red-tint); color: var(--red); border-color: var(--red); }
+
 /* ---- Pagination ---- */
 .pagination {
   display: flex;
