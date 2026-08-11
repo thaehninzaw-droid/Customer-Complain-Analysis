@@ -317,7 +317,6 @@ function switchDataSource(source) {
       applyAnalytics(_liveData);
       setSourcePill('live', _liveData.total);
     } else {
-      // Show loading state in chart hosts
       ['chart-monthly','chart-category','chart-priority','chart-status'].forEach(id => {
         const h = document.getElementById(id);
         if (h) h.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:140px;color:#8695A4;font:13px Inter,sans-serif;gap:8px"><span>Loading live data…</span></div>';
@@ -325,6 +324,12 @@ function switchDataSource(source) {
       fetchAndRenderLive();
     }
   }
+
+  // Always reload the complaints table when the source changes
+  currentPage = 1;
+  const lbl = document.getElementById('table-source-label');
+  if (lbl) lbl.textContent = source === 'baseline' ? 'comcast dataset · read-only' : 'live database records';
+  loadTable();
 }
 
 // ─── ML status (unchanged from original) ────────────────────────────────────
@@ -423,22 +428,29 @@ function buildQueryString() {
 }
 
 async function loadTable() {
+  // Baseline mode: serve the Comcast CSV data from the backend
+  // (pre-classified by Algorithms 1+2, cached after first request).
+  // Live mode: serve real database records as before.
+  const endpoint = _currentSource === 'baseline'
+    ? `/admin/complaints/baseline?${buildQueryString()}`
+    : `/admin/complaints?${buildQueryString()}`;
+
   let data;
   try {
-    data = await adminFetch(`/admin/complaints?${buildQueryString()}`);
+    data = await adminFetch(endpoint);
   } catch (e) {
     adminShowToast('Could not load complaints.');
     return;
   }
   lastPageData = data;
-  renderTable(data.items);
+  renderTable(data.items, _currentSource === 'baseline');
   renderPagination(data);
 }
 
 function statusClassFor(status)   { return ['Resolved','Closed'].includes(status) ? 'resolved' : 'pending'; }
 function priorityClassFor(priority) { return (priority||'low').toLowerCase(); }
 
-function renderTable(items) {
+function renderTable(items, readOnly = false) {
   const tbody   = document.getElementById('admin-tbody');
   const emptyEl = document.getElementById('admin-table-empty');
   tbody.innerHTML = '';
@@ -451,30 +463,39 @@ function renderTable(items) {
 
   items.forEach(c => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="ticket-no">#${c.ticket_no}</td>
-      <td>
-        <select class="inline-select" data-field="category" data-ticket="${c.ticket_no}">
+    if (readOnly) tr.classList.add('baseline-row');
+
+    // In baseline (read-only) mode, show labels instead of editable selects
+    const categoryCell = readOnly
+      ? `<span class="inline-label">${escapeHtml(c.category)}</span>`
+      : `<select class="inline-select" data-field="category" data-ticket="${c.ticket_no}">
           ${['Billing','Financial','Technical','Service','Others'].map(cat =>
             `<option value="${cat}" ${cat===c.category?'selected':''}>${cat}</option>`).join('')}
-        </select>
-      </td>
-      <td>
-        <select class="inline-select" data-field="priority" data-ticket="${c.ticket_no}">
+        </select>`;
+
+    const priorityCell = readOnly
+      ? `<span class="inline-label priority-${(c.priority||'low').toLowerCase()}">${escapeHtml(c.priority)}</span>`
+      : `<select class="inline-select" data-field="priority" data-ticket="${c.ticket_no}">
           ${['Low','Medium','High'].map(p =>
             `<option value="${p}" ${p===c.priority?'selected':''}>${p}</option>`).join('')}
-        </select>
-      </td>
+        </select>`;
+
+    const statusCell = readOnly
+      ? `<span class="inline-label ${statusClassFor(c.status)}">${escapeHtml(c.status)}</span>`
+      : `<select class="inline-select" data-field="status" data-ticket="${c.ticket_no}">
+          ${['Pending','In Progress','Resolved','Closed'].map(s =>
+            `<option value="${s}" ${s===c.status?'selected':''}>${s}</option>`).join('')}
+        </select>`;
+
+    tr.innerHTML = `
+      <td class="ticket-no">#${c.ticket_no}</td>
+      <td>${categoryCell}</td>
+      <td>${priorityCell}</td>
       <td class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(c.complaint)}</td>
       <td>${escapeHtml(c.date_month_year)}</td>
       <td>${escapeHtml(c.city||'—')}</td>
       <td>${escapeHtml(c.received_via)}</td>
-      <td>
-        <select class="inline-select" data-field="status" data-ticket="${c.ticket_no}">
-          ${['Pending','In Progress','Resolved','Closed'].map(s =>
-            `<option value="${s}" ${s===c.status?'selected':''}>${s}</option>`).join('')}
-        </select>
-      </td>
+      <td>${statusCell}</td>
       <td>
         <button type="button" class="row-btn row-btn-view" data-action="view" data-ticket="${c.ticket_no}">👁 View</button>
       </td>
@@ -482,11 +503,14 @@ function renderTable(items) {
     tbody.appendChild(tr);
   });
 
+  // Only wire up edits for live rows
+  if (!readOnly) {
+    tbody.querySelectorAll('select.inline-select').forEach(sel => {
+      sel.addEventListener('change', () => handleInlineEdit(sel));
+    });
+  }
   tbody.querySelectorAll('[data-action="view"]').forEach(btn => {
     btn.addEventListener('click', () => openViewModal(Number(btn.dataset.ticket)));
-  });
-  tbody.querySelectorAll('select.inline-select').forEach(sel => {
-    sel.addEventListener('change', () => handleInlineEdit(sel));
   });
 }
 

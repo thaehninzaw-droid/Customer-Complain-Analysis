@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .admin_seed import ensure_admin_seeded
+from .baseline_cache import get_baseline
 from .dataset_seed import ensure_dataset_seeded
 from .analytics import compute_analytics
 from .auth import AuthError, build_new_user, next_user_id, validate_signup
@@ -313,6 +314,65 @@ def list_all_complaints_admin(
 
     return AdminComplaintListOut(
         items=[_to_complaint_out(d) for d in page_docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@app.get("/admin/complaints/baseline", response_model=AdminComplaintListOut)
+def list_baseline_complaints(
+    admin_id: int = Depends(get_current_admin_id),
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=15, ge=1, le=200),
+):
+    """Serves the full Comcast dataset (2224 rows) from the CSV file,
+    with Algorithm 1 and Algorithm 2 applied to every row, paginated
+    and filterable with the same interface as GET /admin/complaints.
+
+    Results are cached in memory after the first call (a few seconds
+    to classify all rows on first request, instant thereafter).
+    Read-only - rows come from the CSV, not the live database, so
+    inline edits are not applied here. See app/baseline_cache.py."""
+    rows = get_baseline()
+
+    if category:
+        rows = [r for r in rows if r.get("category") == category]
+    if status:
+        rows = [r for r in rows if r.get("status") == status]
+    if priority:
+        rows = [r for r in rows if r.get("priority") == priority]
+    if search:
+        sl = search.strip().lower()
+        if search.strip().isdigit():
+            tn = int(search.strip())
+            rows = [r for r in rows if r.get("ticket_no") == tn or sl in r.get("complaint", "").lower()]
+        else:
+            rows = [r for r in rows if sl in r.get("complaint", "").lower()]
+
+    total = len(rows)
+    start = (page - 1) * page_size
+    page_rows = rows[start:start + page_size]
+
+    return AdminComplaintListOut(
+        items=[ComplaintOut(
+            ticket_no=r["ticket_no"],
+            user_id=r["user_id"],
+            complaint=r["complaint"],
+            category=r["category"],
+            priority=r["priority"],
+            status=r["status"],
+            date_month_year=r["date_month_year"],
+            time=r.get("time", ""),
+            city=r.get("city", ""),
+            state=r.get("state", ""),
+            zipcode=r.get("zipcode", ""),
+            received_via=r.get("received_via", "Web Form"),
+        ) for r in page_rows],
         total=total,
         page=page,
         page_size=page_size,

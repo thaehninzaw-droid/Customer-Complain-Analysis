@@ -1048,6 +1048,83 @@ all HTML pages parse without errors.
 
 ---
 
+## Decision 28: Comcast baseline pagination in admin table; junior's MongoDB error analysed; Qdrant/Cursor test fixes
+
+**Context:** Three separate things addressed in one session.
+
+**1. Baseline complaints table with full pagination (the main work)**
+
+Before this: the chart toggle ("📊 Comcast Baseline" / "🔴 Live Data")
+only switched the four analytics charts. The "All Complaints" table
+below always showed live database records regardless of toggle state,
+which confused the junior team ("when I select Comcast dataset the
+table still shows live data"). Previously: this was labelled a UX
+clarification, not a bug. This session: actually implemented the
+full switch so the table follows the toggle.
+
+New endpoint: `GET /admin/complaints/baseline` — reads all 2224 rows
+from `comcast_complaints.csv`, applies Algorithm 1 (category
+classifier) and Algorithm 2 (priority predictor) to each row via the
+same `classify_complaint` + `predict_priority` functions used for live
+complaints, caches the results in memory (`app/baseline_cache.py`,
+thread-safe double-checked locking), then returns paginated/filtered
+JSON in the same shape as `GET /admin/complaints`. First call takes a
+few seconds (classifying 2224 rows); all subsequent calls are instant
+from cache.
+
+Frontend: `loadTable()` now reads `_currentSource` and hits
+`/admin/complaints/baseline` in baseline mode vs `/admin/complaints`
+in live mode. `renderTable()` gained a `readOnly` flag: baseline rows
+show pill labels instead of `<select>` dropdowns so they're visually
+distinct (can't edit history), while live rows keep full inline-edit
+selects. `switchDataSource()` now resets `currentPage = 1` and calls
+`loadTable()` so the table switches immediately. The toggle sub-label
+updated from "affects charts only" to "affects charts and the
+complaints table below." The table heading updates dynamically:
+"comcast dataset · read-only" vs "live database records."
+
+Verified: `app/baseline_cache.get_baseline()` returns 2224 rows,
+465 Billing rows, 149 pages of 15, 4 items on the last page. 103/103
+tests still passing.
+
+**2. Junior's MongoDB Atlas `ServerSelectionTimeoutError`**
+
+Error: `No replica set members match selector "Primary()"`. Topology:
+shard-00-00 RSSecondary ✓, shard-00-01 RSSecondary ✓, shard-00-02
+Unknown (NetworkTimeout). **This is a network problem on her device,
+not a code or credential problem.** 0.0.0.0/0 Atlas whitelist is
+correct. The owner's machine works fine on the same connection string,
+which rules out wrong URI, wrong credentials, wrong cluster. One of
+the three Atlas shards (shard-00-02) is unreachable from her network
+— this creates a split-brain where the replica set can see secondaries
+but not elect a primary, blocking all writes and most reads.
+
+Likely causes and things to try (in order): (1) her ISP or corporate
+network blocks port 27017 to specific IP ranges — test by trying a
+different network (phone hotspot is the fastest test); (2) Windows
+Firewall or antivirus blocking outbound port 27017 — disable
+temporarily to test; (3) if on a VPN, the VPN may be routing Atlas
+traffic asymmetrically — disconnect VPN and retry; (4) check her
+`ping ac-01f50qg-shard-00-02.ldkskgs.mongodb.net` — if it times out
+while the other two don't, the problem is confirmed network-side.
+
+**3. Two test fixes (from ChatGPT's analysis, independently verified)**
+
+Both confirmed by reading the actual code before trusting the analysis:
+- `test_admin_seed.py::test_ensure_admin_seeded_is_idempotent`: called
+  `len(collection.find())` which fails on a real pymongo `Cursor`
+  (no `__len__`). Fixed with `list(...)` wrapper.
+- `test_vector_store.py` (3 tests): `QDRANT_URL` is captured into a
+  module-level constant at import time. Once a real Qdrant URL is in
+  `.env`, `reset_memory_store()` has no effect — `is_configured()`
+  returns True and test vectors (3-dim) hit the real Qdrant collection
+  (768-dim) → dimension mismatch. Fixed by: (a) making `is_configured()`
+  read from `sys.modules[__name__].QDRANT_URL` so it respects
+  monkeypatching, and (b) adding an `autouse` fixture that patches
+  `vector_store.QDRANT_URL` to `None` before each test.
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
