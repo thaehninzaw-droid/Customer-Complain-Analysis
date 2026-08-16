@@ -100,11 +100,13 @@ def main():
 
     client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=10_000)
     # Detect DB name from URI or fall back
-    db_name = args.db
-    if not db_name:
-        # Try to get from URI path component
-        path = MONGODB_URI.split("mongodb.net/")[-1].split("?")[0].strip("/")
-        db_name = path if path else "loopline"
+    # Auto-detect the database name using the same logic and default
+    # as app/db.py: env var MONGODB_DB_NAME, defaults to "complaints_db".
+    # The cleanup script previously tried to parse the name out of the
+    # URI path (which Atlas URIs don't include), fell back to "loopline",
+    # and found 0 documents because the real DB is "complaints_db".
+    # Fixed to match db.py exactly. See docs/DECISIONS.md #30.
+    db_name = args.db or os.getenv("MONGODB_DB_NAME", "complaints_db")
 
     db = client[db_name]
     complaints_col = db["complaints"]
