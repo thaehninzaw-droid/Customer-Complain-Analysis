@@ -32,6 +32,7 @@ time Google ships a new version. Override via GEMINI_MODEL in .env if
 you want to pin a specific version instead.
 """
 import os
+import time
 
 import requests
 
@@ -42,6 +43,13 @@ GEMINI_EMBEDDING_DIM = int(os.getenv("GEMINI_EMBEDDING_DIM", "768"))
 
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 TIMEOUT_SECONDS = 20
+
+# Gemini free tier: max 100 texts per batchEmbedContents call.
+# We split into sub-batches and wait between them so a large knowledge
+# base re-index doesn't exhaust the 1000/day quota in one burst.
+# Override via .env if you upgrade to a paid tier with higher limits.
+EMBED_BATCH_SIZE = int(os.getenv("GEMINI_EMBED_BATCH_SIZE", "50"))
+EMBED_BATCH_DELAY = float(os.getenv("GEMINI_EMBED_BATCH_DELAY", "2.0"))  # seconds
 
 
 class GeminiError(Exception):
@@ -137,15 +145,23 @@ def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
         _raise_with_body(e, "embedContent")
 
 
-def embed_texts(texts: list, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
-    """Batch version - one HTTP call for many chunks (used when
-    indexing the knowledge base). Falls back to sequential embed_text()
-    calls if the batch endpoint errors on a given deployment."""
-    if not is_configured():
-        raise GeminiError("GEMINI_API_KEY is not set.")
-    if not texts:
-        return []
+def _retry_delay_from_429(resp: requests.Response) -> float:
+    """Read the retryDelay from Google's 429 body (e.g. '4.59s').
+    Falls back to 10 seconds if unparseable."""
+    try:
+        for detail in resp.json().get("error", {}).get("details", []):
+            if "retryDelay" in detail:
+                s = detail["retryDelay"].rstrip("s")
+                return float(s) + 1.0  # add 1 s safety margin
+    except Exception:
+        pass
+    return 10.0
 
+
+def _embed_one_batch(texts: list, task_type: str, max_retries: int = 4) -> list:
+    """Sends one batchEmbedContents call (≤ EMBED_BATCH_SIZE items).
+    Retries automatically on 429 using the delay Google includes in
+    the response body."""
     url = f"{BASE_URL}/{GEMINI_EMBEDDING_MODEL}:batchEmbedContents"
     body = {
         "requests": [
@@ -158,15 +174,59 @@ def embed_texts(texts: list, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
             for t in texts
         ]
     }
-    try:
-        resp = requests.post(url, headers=_headers(), json=body, timeout=TIMEOUT_SECONDS * 2)
-        resp.raise_for_status()
-        data = resp.json()
-        embeddings = data.get("embeddings")
-        if not embeddings or len(embeddings) != len(texts):
-            raise GeminiError(f"Unexpected batchEmbedContents response shape: {data}")
-        return [e["values"] for e in embeddings]
-    except requests.RequestException:
-        # Fall back to one-by-one - slower but more likely to succeed
-        # if the batch endpoint isn't available on this API version.
-        return [embed_text(t, task_type=task_type) for t in texts]
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=_headers(), json=body,
+                                 timeout=TIMEOUT_SECONDS * 2)
+            if resp.status_code == 429:
+                wait = _retry_delay_from_429(resp)
+                print(f"[gemini] Rate limited — waiting {wait:.1f}s "
+                      f"(attempt {attempt + 1}/{max_retries})…")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            embeddings = data.get("embeddings") or []
+            if len(embeddings) != len(texts):
+                raise GeminiError(
+                    f"batchEmbedContents returned {len(embeddings)} vectors "
+                    f"for {len(texts)} inputs: {data}"
+                )
+            return [e["values"] for e in embeddings]
+        except requests.RequestException as e:
+            if attempt == max_retries - 1:
+                _raise_with_body(e, "batchEmbedContents")
+            time.sleep(2 ** attempt)
+    raise GeminiError("batchEmbedContents failed after all retries")
+
+
+def embed_texts(texts: list, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
+    """Embeds a list of texts, splitting into sub-batches of
+    EMBED_BATCH_SIZE (default 50) so we stay inside Gemini's 100-per-
+    request limit and don't blow the daily free-tier quota in one burst.
+    Waits EMBED_BATCH_DELAY seconds between sub-batches.
+
+    Previous version sent ALL chunks in one request - this caused a
+    400 when chunks > 100 (Gemini's batchEmbedContents limit), which
+    then fell back to N individual embed_text() calls, burning through
+    the 1000/day free-tier quota in seconds. See docs/DECISIONS.md #30.
+    """
+    if not is_configured():
+        raise GeminiError("GEMINI_API_KEY is not set.")
+    if not texts:
+        return []
+
+    total = len(texts)
+    all_vectors = []
+    for start in range(0, total, EMBED_BATCH_SIZE):
+        sub = texts[start:start + EMBED_BATCH_SIZE]
+        batch_num = start // EMBED_BATCH_SIZE + 1
+        total_batches = (total + EMBED_BATCH_SIZE - 1) // EMBED_BATCH_SIZE
+        print(f"[gemini] Embedding batch {batch_num}/{total_batches} "
+              f"({len(sub)} chunks)…")
+        all_vectors.extend(_embed_one_batch(sub, task_type))
+        # Sleep between sub-batches (not after the last one)
+        if start + EMBED_BATCH_SIZE < total:
+            time.sleep(EMBED_BATCH_DELAY)
+
+    return all_vectors
