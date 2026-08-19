@@ -1,14 +1,24 @@
 """
-RAG pipeline: BM25 search → Gemini generateContent → answer.
+RAG pipeline: Hybrid retrieval (BM25 + optional Gemini embeddings) →
+Gemini generateContent → answer.
 
-Gemini is used ONLY for generating the final answer, not for embedding.
-Retrieval is handled by app/rag/bm25_store.py (pure Python, no API).
+Retrieval is handled by app/rag/hybrid_retriever.py (HybridRetriever).
+  - BM25: always available, pure Python, no API calls.
+  - Gemini embeddings: optional, query-only (never indexes the corpus),
+    fused with BM25 via Reciprocal Rank Fusion (RRF).
+  - Graceful degradation: if Gemini embeddings are unavailable for any
+    reason (missing key, timeout, rate limit), BM25-only results are
+    used silently.
 
-Raises gemini_client.GeminiError on Gemini failures — callers catch
-this and fall back to the template response (see app/chatbot.py).
+Gemini generateContent is still required for the final answer.
+Raises gemini_client.GeminiError on generation failures — callers
+(app/chatbot.py) catch this and fall back to the template response.
+
+See docs/DECISIONS.md Decision 30 and docs/RAG_CHATBOT.md.
 """
 from . import gemini_client
-from .bm25_store import get_index, is_indexed
+from .bm25_store import is_indexed
+from .hybrid_retriever import get_retriever
 
 SYSTEM_INSTRUCTION = (
     "You are an internal assistant for customer-support admins at a telecom "
@@ -22,12 +32,18 @@ SYSTEM_INSTRUCTION = (
 
 
 def answer(question: str, extra_context: str = None, top_k: int = 5) -> dict:
-    """Returns {"answer": str, "sources": [str, ...], "used_rag": bool}.
-    Raises GeminiError if Gemini isn't configured or the call fails."""
+    """Returns {"answer": str, "sources": [str, ...], "used_rag": bool,
+                "used_bm25": bool, "used_embeddings": bool}.
+    Raises GeminiError if Gemini isn't configured or the generation call fails.
+
+    The API surface is backward-compatible: callers that only read
+    "answer", "sources", and "used_rag" continue to work unchanged.
+    The two new boolean fields are informational extras for the UI.
+    """
     if not gemini_client.is_configured():
         raise gemini_client.GeminiError("GEMINI_API_KEY not configured.")
 
-    # ── BM25 retrieval (no API call) ─────────────────────────────────────
+    # ── Hybrid retrieval (BM25 always; embeddings if available) ──────────
     if not is_indexed():
         context_block = (
             "No knowledge base indexed yet. "
@@ -35,9 +51,18 @@ def answer(question: str, extra_context: str = None, top_k: int = 5) -> dict:
         )
         sources = []
         used_rag = False
+        used_bm25 = False
+        used_embeddings = False
     else:
-        index = get_index()
-        hits = index.search(question, top_k=top_k) if index else []
+        retriever = get_retriever()
+
+        # Run both arms so we can report which ones contributed.
+        bm25_hits = retriever.search_bm25(question, top_k=top_k)
+        emb_hits = retriever.search_embeddings(question, top_k=top_k)
+        hits = retriever.fuse_results(bm25_hits, emb_hits)[:top_k]
+
+        used_bm25 = bool(bm25_hits)
+        used_embeddings = bool(emb_hits)
 
         if hits:
             context_block = "\n\n---\n\n".join(
@@ -63,4 +88,10 @@ def answer(question: str, extra_context: str = None, top_k: int = 5) -> dict:
     prompt = "\n\n".join(prompt_parts)
 
     text = gemini_client.generate_text(prompt, system_instruction=SYSTEM_INSTRUCTION)
-    return {"answer": text, "sources": sources, "used_rag": used_rag}
+    return {
+        "answer": text,
+        "sources": sources,
+        "used_rag": used_rag,
+        "used_bm25": used_bm25,
+        "used_embeddings": used_embeddings,
+    }

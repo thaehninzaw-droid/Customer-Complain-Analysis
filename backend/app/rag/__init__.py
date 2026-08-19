@@ -1,13 +1,18 @@
 """
 RAG (Retrieval-Augmented Generation) pipeline for the Admin AI Chatbot
-module (SRS 3.2): Gemini for embeddings + generation, Qdrant for
-vector storage, a small markdown/PDF knowledge base of SOPs.
+module (SRS 3.2).
 
-  gemini_client.py   - REST wrapper around the Gemini API
-  vector_store.py     - Qdrant REST wrapper + in-memory fallback
-  knowledge_base.py   - loads/chunks/indexes the SOP documents
-  pipeline.py          - ties the above together into ask(question)
+Retrieval: hybrid BM25 + optional Gemini query embeddings (RRF fusion).
+Generation: Gemini generateContent.
 
-See docs/RAG_CHATBOT.md for the architecture and setup instructions,
-and DECISIONS.md for why this stack (Gemini + Qdrant) was chosen.
+  bm25_store.py        - pure-Python Okapi BM25 index (JSON persistence)
+  hybrid_retriever.py  - HybridRetriever: BM25 + embeddings + RRF fusion
+  gemini_client.py     - REST wrapper for Gemini generate + embed endpoints
+  vector_store.py      - Qdrant REST wrapper + in-memory cosine fallback
+                         (used by hybrid_retriever for embedding path)
+  knowledge_base.py    - loads/chunks/indexes SOP docs into BM25 index
+  pipeline.py          - ties retrieval + generation into answer(question)
+
+See docs/RAG_CHATBOT.md for the full architecture and setup instructions.
+See docs/DECISIONS.md Decision 30 for the BM25 pivot and hybrid design.
 """

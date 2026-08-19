@@ -1,4 +1,13 @@
-# The RAG chatbot (Gemini + Qdrant)
+# The RAG Chatbot
+
+> **Current stack:** BM25 keyword retrieval (always available, no API)
+> + optional Gemini query embeddings fused via Reciprocal Rank Fusion
+> → Gemini `generateContent` for the final answer.
+>
+> See **docs/DECISIONS.md Decision 30** for why the original
+> Gemini embeddings + Qdrant indexing was replaced by BM25.
+
+---
 
 ## Quick answer for junior team: what goes in `data/knowledge_base/`?
 
@@ -11,17 +20,16 @@ datasets.** This is the most common point of confusion:
 | `synthetic_complaints.csv` | Dev-only fallback if the CSV is missing | CSV | `backend/data/` |
 | SOP / playbook files | **RAG chatbot** knowledge base — what the admin AI searches | `.md`, `.txt`, or `.pdf` | `backend/data/knowledge_base/` |
 
-The five files already in `data/knowledge_base/` (one per complaint
-category) are Markdown SOP documents: step-by-step guides that tell an
-admin how to handle billing disputes, technical outages, etc. When an
-admin asks the chatbot "how should I handle a repeat billing complaint?",
-the chatbot embeds the question, searches Qdrant for the most relevant
-SOP chunks, and hands those to Gemini to generate a grounded answer.
+The files in `data/knowledge_base/` (one per complaint category) are
+Markdown SOP documents: step-by-step guides telling admins how to
+handle billing disputes, technical outages, etc. When an admin asks
+"how should I handle a repeat billing complaint?", the system searches
+these documents for the most relevant chunks and hands them to Gemini
+to generate a grounded answer.
 
 **PDF files are fully supported.** Drop any `.pdf` into `data/
-knowledge_base/` and re-run `python -m app.rag.knowledge_base` — it
-gets picked up automatically, no code changes needed. A real internal
-SOP manual PDF is a great fit here.
+knowledge_base/` and re-run `python -m app.rag.knowledge_base` — it's
+picked up automatically, no code changes needed.
 
 **The training datasets are never read by the chatbot.** They only
 train the ML models (which run locally, without Gemini). The two
@@ -29,39 +37,21 @@ pipelines are completely independent.
 
 ---
 
-Two chatbot consumers, one underlying pipeline:
+## Two chatbot consumers, one pipeline
 
-- **Customer-facing widget** (`POST /chatbot/recommend`) - the
-  floating chat widget on the homepage. Simple: complaint text in,
-  category + a recommended action out.
-- **Admin AI Chatbot** (`POST /admin/chatbot/ask`, SRS Module 3.2) -
+- **Customer-facing widget** (`POST /chatbot/recommend`) — the
+  floating chat widget on the homepage. Complaint text in,
+  category + recommended action out.
+- **Admin AI Chatbot** (`POST /admin/chatbot/ask`, SRS Module 3.2) —
   free-form Q&A for support agents, optionally scoped to a specific
   ticket, grounded in indexed SOP documents.
 
 Both go through `app/chatbot.py`, which tries the real RAG pipeline
 (`app/rag/pipeline.py`) first and falls back to a static template if
-Gemini isn't configured or the call fails for any reason - same
-"never let an AI integration break the request" rule used for the two
-ML algorithms.
+Gemini isn't configured or the call fails — same "never let an AI
+integration break the request" rule used for the two ML algorithms.
 
-## Why Gemini + Qdrant
-
-Chosen because that's what was specified for this build (see
-DECISIONS.md). Both are used over **plain REST calls via `requests`**
-rather than their official SDK packages (`google-genai`,
-`qdrant-client`) - the environment this was built in has neither
-package installed and no internet access to add or test them, and a
-`requests`-based wrapper is one fewer dependency that has to install
-correctly on someone else's machine. Swap either for the official SDK
-later without touching anything outside `app/rag/gemini_client.py` /
-`app/rag/vector_store.py`.
-
-**⚠️ Not runtime-tested against the real APIs** - see docs/TESTING.md.
-The request/response shapes below were verified against the live API
-documentation (not from training-data memory, which would be stale -
-see the citations), but no actual HTTP call has been made against
-Gemini or Qdrant from this codebase yet. Test this first once you have
-real API keys.
+---
 
 ## Architecture
 
@@ -69,43 +59,72 @@ real API keys.
 Admin asks a question (optionally: "about ticket #100042")
         │
         ▼
-1. Embed the question — Gemini embedContent, task_type=RETRIEVAL_QUERY
+1. BM25 search (app/rag/bm25_store.py)
+   — pure Python, no API call, always available
+   — strong for exact keyword matches ("billing", "outage", "escalation")
         │
         ▼
-2. Search the vector store for the top-k closest SOP chunks
-   (Qdrant if QDRANT_URL is set, else an in-memory brute-force
-    cosine-similarity fallback - app/rag/vector_store.py)
+2. (Optional) Embed the query — Gemini embedContent, RETRIEVAL_QUERY
+   then search the vector store (Qdrant if configured, in-memory fallback)
+   — adds semantic coverage for paraphrases
+   — silently skipped if GEMINI_API_KEY missing or embedding fails
         │
         ▼
-3. Build a grounded prompt: SOP context + (optional ticket context)
-   + the question, with a system instruction telling Gemini to answer
-   from the context and say so plainly if the context doesn't cover it
+3. Reciprocal Rank Fusion (app/rag/hybrid_retriever.py)
+   — merges the BM25 and embedding ranked lists
+   — score = Σ 1/(60 + rank_i) for each retriever that returned the chunk
+   — chunks appearing in both lists score significantly higher
         │
         ▼
-4. Gemini generateContent produces the answer
+4. Build a grounded prompt: top-k fused SOP chunks + (optional ticket
+   context) + the question, with a system instruction telling Gemini to
+   answer from the context and say so plainly if it doesn't cover it
         │
         ▼
-Returns {"answer": ..., "sources": [...], "used_rag": true}
+5. Gemini generateContent produces the answer
+        │
+        ▼
+Returns {"answer": ..., "sources": [...], "used_rag": bool,
+         "used_bm25": bool, "used_embeddings": bool}
 ```
+
+---
 
 ## Indexing the knowledge base
 
-`data/knowledge_base/` holds 5 markdown SOP documents (Billing,
-Financial, Technical, Service, Others) written for this project -
-resolution steps, escalation criteria, response-time targets per
-category. Real SOP PDFs can be dropped into the same folder; `app/rag/
-knowledge_base.py` picks up `.pdf` files too via `pypdf` text
-extraction, no code changes needed.
+`data/knowledge_base/` holds Markdown SOP documents. Build (or
+rebuild) the BM25 index:
 
-Build (or rebuild) the index:
 ```bash
+cd backend/
 python -m app.rag.knowledge_base
 ```
-This chunks each document (paragraph-aware, ~800 characters per
-chunk), embeds every chunk via Gemini's `batchEmbedContents`
-(`task_type=RETRIEVAL_DOCUMENT` - the asymmetric embedding setup
-Google's docs recommend for retrieval use cases), and upserts into the
-vector store. Re-run it any time the SOP docs change.
+
+Output when it works:
+```
+[knowledge_base] 5 document(s) → 2315 chunks
+[knowledge_base] BM25 index saved → .bm25_index.json
+[knowledge_base] Ready. No API calls needed — Gemini is only
+                 used when an admin asks a question.
+```
+
+This runs completely offline — no Gemini API key needed at index time.
+The index is saved as `data/knowledge_base/.bm25_index.json`. Re-run
+it any time the SOP docs change.
+
+To wipe the index and start fresh:
+```bash
+python -m app.rag.knowledge_base --clear
+```
+
+**What the indexing does NOT do (intentionally):**
+- It does **not** embed the document chunks with Gemini. This would
+  consume ≈2315 embedding calls (the full chunk count), burning through
+  the free-tier 1000/day quota instantly. Instead, only the query is
+  embedded at question time — one call per admin question, not thousands.
+- It does **not** require Qdrant. The BM25 index is a local JSON file.
+
+---
 
 ## Configuration
 
@@ -113,62 +132,139 @@ All in `.env` (see `.env.example`):
 
 | Variable | Required? | Default | Notes |
 |---|---|---|---|
-| `GEMINI_API_KEY` | No - falls back to templates if unset | — | Get one at https://aistudio.google.com/apikey |
-| `GEMINI_MODEL` | No | `gemini-flash-latest` | A Google-maintained alias that always points at the current GA Flash model (`gemini-3.5-flash` as of July 2026) - avoids needing a manual version bump later. Pin a specific version instead if you want fully reproducible behavior. |
-| `GEMINI_EMBEDDING_MODEL` | No | `gemini-embedding-001` | Stable embedding model; `gemini-embedding-2-preview` supports Matryoshka dimensionality reduction and multimodal input if you need that later. |
-| `GEMINI_EMBEDDING_DIM` | No | `768` | Output embedding size. |
-| `QDRANT_URL` | No - falls back to in-memory search if unset | — | e.g. a free Qdrant Cloud cluster, or `http://localhost:6333` for a local Docker instance |
+| `GEMINI_API_KEY` | No — falls back to templates if unset | — | Get one at https://aistudio.google.com/apikey |
+| `GEMINI_MODEL` | No | `gemini-flash-latest` | Google-maintained alias always pointing at the current GA Flash model. Pin a specific version if you need reproducibility. |
+| `GEMINI_EMBEDDING_MODEL` | No | `gemini-embedding-001` | Only used for query embedding in hybrid mode. |
+| `GEMINI_EMBEDDING_DIM` | No | `768` | Output embedding dimension. |
+| `QDRANT_URL` | No — falls back to in-memory cosine search if unset | — | Only relevant for the hybrid embedding path. |
 | `QDRANT_API_KEY` | Only if using Qdrant Cloud | — | |
 | `QDRANT_COLLECTION` | No | `loopline_sop_chunks` | |
 
-## API shapes this was built against (verified July 2026, corrected
-## against a real 400 error - see docs/DECISIONS.md #24)
+**Minimal working config (BM25-only, no embeddings):** just set
+`GEMINI_API_KEY`. No Qdrant needed. The chatbot will use BM25 for
+retrieval and Gemini only for generating the answer.
 
-**Chat completion** - `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+**Full hybrid config:** set `GEMINI_API_KEY` + `QDRANT_URL` (and
+optionally `QDRANT_API_KEY`). You'll also need to have upserted
+vectors into Qdrant separately — the current indexing script does not
+do this automatically (by design, to avoid quota exhaustion).
+
+---
+
+## How the hybrid retriever works (app/rag/hybrid_retriever.py)
+
+```python
+class HybridRetriever:
+    def search_bm25(self, query, top_k=5)     → list[dict]  # always runs
+    def search_embeddings(self, query, top_k=5) → list[dict] # optional
+    def fuse_results(self, bm25, emb, k=60)   → list[dict]  # RRF
+    def search(self, query, top_k=5)           → list[dict]  # orchestrates all
+```
+
+**Reciprocal Rank Fusion (RRF):**
+```
+score(chunk) = Σ  1 / (k + rank_in_list_i)
+```
+where k=60 is the standard default (Cormack et al. 2009). A chunk
+ranked #1 in BM25 and #1 in embeddings scores ≈ 2/61 ≈ 0.033. A chunk
+ranked #5 in only one list scores 1/65 ≈ 0.015. Chunks that exact-match
+the query dominate naturally because BM25 puts them at the top.
+
+---
+
+## Gemini API shapes (verified July 2026)
+
+**Chat completion** — `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
 ```json
 {"contents": [{"parts": [{"text": "..."}]}]}
 ```
-Header: `x-goog-api-key: <key>`. Response:
-`data.candidates[0].content.parts[*].text`.
+Header: `x-goog-api-key: <key>`. Response: `data.candidates[0].content.parts[*].text`.
 
-**Embeddings** - `POST .../v1beta/models/{model}:embedContent`
+**Single embedding** — `POST .../v1beta/models/{model}:embedContent`
 ```json
-{"model": "models/gemini-embedding-001", "content": {"parts": [{"text": "..."}]}, "taskType": "RETRIEVAL_DOCUMENT", "outputDimensionality": 768}
+{
+  "model": "models/gemini-embedding-001",
+  "content": {"parts": [{"text": "..."}]},
+  "taskType": "RETRIEVAL_QUERY",
+  "outputDimensionality": 768
+}
 ```
-The `"model"` field inside the body is easy to assume is redundant
-(the model is already in the URL) and skip - don't. A real deployment
-hit a `400 Bad Request` traced to exactly that omission in
-`embed_text()` (see docs/DECISIONS.md #24) - every official example
-includes it. Response: `data.embedding.values`. Batch version:
-`:batchEmbedContents` with a `"requests"` array (each item needs its
-own `"model"` field too), response `data.embeddings[*].values`.
+The `"model"` field inside the body is required even though it's also
+in the URL — a real deployment hit a `400 Bad Request` traced to
+omitting it (see docs/DECISIONS.md #24). Response: `data.embedding.values`.
 
-If you hit a `400` here: the error shown in the admin chatbot UI now
-includes Google's actual response body (see `app/rag/gemini_client.py`'s
-`_raise_with_body()`), not just the HTTP status line - read that first.
-A bare 400 with no useful body text is more likely a project-level
-issue (billing not enabled, free tier unavailable in your region) than
-a malformed request - check the Google AI Studio / Cloud console
-directly rather than only re-reading this code.
+**Batch embedding** — `:batchEmbedContents` with a `"requests"` array
+(each item needs its own `"model"` field), response `data.embeddings[*].values`.
+Current pipeline does NOT use batch embedding at index time — this is
+intentional to avoid quota exhaustion.
 
-**Qdrant** - `PUT /collections/{name}` to create (`{"vectors": {"size":
-N, "distance": "Cosine"}}`), `PUT /collections/{name}/points` to
-upsert (`{"points": [{"id", "vector", "payload"}]}`), `POST
-/collections/{name}/points/search` to query (`{"vector", "limit",
-"with_payload": true}`). Header: `api-key: <key>`.
+**Qdrant** — `PUT /collections/{name}` to create, `PUT /collections/{name}/points`
+to upsert, `POST /collections/{name}/points/search` to query. Header: `api-key: <key>`.
 
-Source: https://ai.google.dev/gemini-api/docs/embeddings and
-https://ai.google.dev/gemini-api/docs/text-generation (Gemini), and
-Qdrant's REST API reference (Qdrant), both fetched directly while
-building this rather than relied on from training-data memory, since
-API details are exactly the kind of thing that goes stale.
+Sources:
+- https://ai.google.dev/gemini-api/docs/embeddings
+- https://ai.google.dev/gemini-api/docs/text-generation
+- Qdrant REST API reference
+
+---
 
 ## Failure modes handled
 
-- No `GEMINI_API_KEY` → template response, `used_rag: false`, no error.
-- `GEMINI_API_KEY` set but the call fails (bad key, network, rate
-  limit, quota) → caught in `app/chatbot.py`, returns a plain-language
-  error message instead of a 500.
-- No knowledge base indexed yet → `vector_store.search()` returns an
-  empty list, the prompt says so explicitly rather than hallucinating
-  context, Gemini is told to say the context doesn't cover it.
+| Situation | Behaviour |
+|---|---|
+| No `GEMINI_API_KEY` | Template response, `used_rag: false`, no error |
+| Gemini generation fails (timeout, bad key, rate limit) | Caught in `app/chatbot.py`; returns a plain-language error, not a 500 |
+| Gemini embedding fails or times out | Silently falls back to BM25-only; no error surfaced |
+| Qdrant unavailable | Silently falls back to BM25-only; no error surfaced |
+| No knowledge base indexed yet (`--clear` was run, no rebuild) | Answer includes a note to run `python -m app.rag.knowledge_base` |
+| BM25 finds no matches | Prompt tells Gemini the context doesn't cover it; Gemini answers from general knowledge |
+
+**Error message in the admin chatbot UI:**
+- Old (inaccurate): "The AI chatbot hit an error talking to Gemini/Qdrant..."
+- New (accurate): "The AI chatbot hit an error generating a response... Keyword search (BM25) is still available — try rephrasing..."
+
+---
+
+## File map
+
+| File | Role |
+|---|---|
+| `app/rag/bm25_store.py` | Pure-Python Okapi BM25 (k1=1.5, b=0.75), JSON persistence, thread-safe cache |
+| `app/rag/hybrid_retriever.py` | `HybridRetriever`: BM25 + Gemini query embeddings + RRF fusion |
+| `app/rag/gemini_client.py` | REST wrapper for Gemini `generateContent` and `embedContent` / `batchEmbedContents` |
+| `app/rag/vector_store.py` | Qdrant REST wrapper + in-memory cosine fallback (used by embedding path) |
+| `app/rag/knowledge_base.py` | Loads SOP docs, chunks them, builds BM25 index, saves `.bm25_index.json` |
+| `app/rag/pipeline.py` | Calls `HybridRetriever.search()` → builds prompt → calls Gemini generate |
+| `app/chatbot.py` | Entry points: `get_recommendation()` and `ask_admin_chatbot()` |
+
+**Legacy / partially superseded:**
+- `app/rag/vector_store.py` — still present and used by the embedding
+  arm of `HybridRetriever`. The Qdrant path is only exercised if
+  `QDRANT_URL` is set and vector data has been upserted.
+- `gemini_client.embed_text` / `embed_texts` — `embed_text` is used by
+  `HybridRetriever.search_embeddings()` for query-time embedding.
+  `embed_texts` (batch) is no longer called anywhere in the live path;
+  it remains as a utility for anyone who wants to manually seed Qdrant
+  with a curated subset of chunks.
+
+---
+
+## Step-by-step setup (minimal: BM25 + Gemini generation only)
+
+1. Get a free Gemini API key at https://aistudio.google.com/apikey
+2. Add `GEMINI_API_KEY=your-key` to `backend/.env`
+3. From `backend/`: `python -m app.rag.knowledge_base`
+4. Start the server: `uvicorn app.main:app --reload`
+5. Open the admin portal → AI Chatbot tab → ask a question
+
+That's it. No Qdrant setup needed for the BM25-only path.
+
+## Step-by-step setup (full hybrid: BM25 + embeddings + Qdrant)
+
+1. Complete the minimal setup above.
+2. Create a free Qdrant Cloud cluster at https://cloud.qdrant.io
+3. Add `QDRANT_URL=https://your-cluster.qdrant.io` and
+   `QDRANT_API_KEY=your-qdrant-key` to `backend/.env`
+4. Manually seed Qdrant with a curated subset of high-value chunks
+   (optional — the system works without this; the embedding path will
+   just return empty results and fall back to BM25 silently).
