@@ -13,13 +13,16 @@ this file is just the *what* and *what's next*.
 | Algorithm 2 - priority prediction | ✅ Done, trained model + baseline fallback |
 | Admin auth (roles, secured endpoints) | ✅ Done |
 | Admin dashboard (table, filters, charts, manual entry, inline edit) | ✅ Done |
-| Admin AI Chatbot (RAG: Gemini + Qdrant) | ✅ Built and **confirmed working on real Gemini + Qdrant** (tested locally by the team — AI Chatbot returns real RAG-backed answers). |
+| Admin AI Chatbot (RAG: BM25 retrieval + Gemini generation) | ✅ Live. Retrieval uses BM25 (pure Python, no quota). Gemini used only for answer generation. Fallback to templates if Gemini is unavailable. |
+| Hybrid retrieval (BM25 + Gemini query embeddings + RRF) | ✅ Implemented. `app/rag/hybrid_retriever.py`. Query-only embedding (no corpus quota risk). BM25 always runs; embeddings are optional and silently skipped on failure. |
 | Full FastAPI HTTP layer test pass | ✅ Confirmed - CI is green (see `docs/TESTING.md`) |
 | Real Kaggle dataset loaded | ✅ Done - `backend/data/comcast_complaints.csv`, both models retrained against it (see `docs/ALGORITHMS.md`) |
 | Pushed to a real GitHub remote | ✅ Done - CI running on every push, confirmed green |
 | Deployed (Render/Atlas/Qdrant Cloud) | ❌ Not yet - credentials ready, see `docs/DEPLOYMENT.md` for the plan |
 | CI (GitHub Actions running tests on push) | ✅ Done and green - `.github/workflows/tests.yml` |
-| Real Gemini/Qdrant calls tested | ✅ **Confirmed working** - tested locally by the team. Knowledge base indexed, chatbot returns real answers with `used_rag: true`. CI still has no API keys (intentional). |
+| BM25 indexing tested | ✅ **Confirmed working** - `python -m app.rag.knowledge_base` → 5 docs → 2315 chunks → `.bm25_index.json`. No API keys needed at index time. |
+| Real Gemini generateContent tested | ✅ **Confirmed working** - team tested locally. Chatbot returns real answers with `used_rag: true`. CI still has no API keys (intentional). |
+| Hybrid embedding path (Gemini embed + Qdrant) tested | ⚠️ Embedding path code is in place (`HybridRetriever.search_embeddings`). Qdrant is not seeded with chunk vectors yet — embedding arm returns `[]` and BM25-only results are used. Fully functional; hybrid kicks in automatically once Qdrant is seeded. |
 | Real MongoDB Atlas tested | ⚠️ Connection string ready, not yet exercised anywhere (CI and local dev both still use the in-memory fallback) |
 | Demo-mode date shifting for presentations | ✅ Done - `--demo-shift-dates` flag, see `docs/DECISIONS.md` #19 |
 | Password show/hide toggle | ✅ Done (small UX addition, `docs/DECISIONS.md` #19) |
@@ -50,7 +53,7 @@ not just in sandboxes:
 - ✅ FastAPI backend — customer + admin flows end-to-end
 - ✅ Algorithm 1 (category classifier, 93.0% accuracy)
 - ✅ Algorithm 2 (priority predictor, 100% vs baseline)
-- ✅ RAG chatbot — Gemini + Qdrant, real knowledge-base answers
+- ✅ RAG chatbot — BM25 keyword retrieval + Gemini answer generation; hybrid retrieval code in place (see Decision 30)
 - ✅ Admin dashboard charts (SVG, no CDN dependency)
 - ✅ CI green on every push (GitHub Actions)
 
@@ -130,7 +133,7 @@ exist.
   exactly where to resume
 - `docs/ARCHITECTURE.md` - system overview, why it's shaped this way
 - `docs/ALGORITHMS.md` - both ML algorithms, methodology, bugs found & fixed
-- `docs/RAG_CHATBOT.md` - Gemini + Qdrant setup and architecture
+- `docs/RAG_CHATBOT.md` - BM25 + hybrid retrieval architecture and setup
 - `docs/ADMIN_AUTH.md` - roles, security model, admin account creation
 - `docs/API_REFERENCE.md` - every endpoint, request/response shapes
 - `docs/TESTING.md` - what's verified vs. reviewed-but-not-run, and why

@@ -1189,6 +1189,85 @@ machines.
 
 ---
 
+## Decision 30: RAG pivot to BM25 + hybrid retrieval (Gemini embeddings + Qdrant → BM25 + optional Gemini query embeddings + RRF)
+
+**Context:** The original RAG stack (Decision 14) embedded every SOP
+chunk with Gemini `batchEmbedContents` at index time and searched
+Qdrant at query time. This hit the free-tier quota (≈1000 embeddings/
+day) within a single re-index run of the five SOP documents (2315
+chunks). The system stopped working until the next day.
+
+**Immediate fix (already shipped before this session):**
+`app/rag/knowledge_base.py` was rewritten to use pure-Python BM25
+(Okapi BM25, `app/rag/bm25_store.py`) at index time. The index is
+saved as `.bm25_index.json`. `app/rag/pipeline.py` calls BM25 for
+retrieval and Gemini `generateContent` only for the final answer —
+no embedding calls at all. This is reflected in the header comment of
+`knowledge_base.py` ("This replaced Gemini embeddings + Qdrant after
+hitting the free tier's 1000/day embedding quota").
+
+However, the documentation (this file, `docs/RAG_CHATBOT.md`,
+`ROADMAP.md`, and others) still described the original Gemini + Qdrant
+architecture, and the fallback error string in `app/chatbot.py` still
+mentioned "Qdrant". This session closes all of those gaps.
+
+**Hybrid upgrade (this session):**
+BM25-only has a known weakness: exact-match only. Paraphrases miss
+("how do I deal with a customer who keeps getting billed" vs "repeat
+billing complaint"). To address this without re-introducing the quota
+problem, a hybrid retrieval mode was added:
+
+- **BM25 is still the default** and runs on every query (no API, no
+  quota, works fully offline).
+- **Gemini query embedding** (one call per admin question, not
+  per-chunk) provides semantic coverage for paraphrases. Only the
+  query is embedded — never the document corpus.
+- **Reciprocal Rank Fusion (RRF)** merges the two ranked lists:
+  `score = Σ 1/(60 + rank_i)` (Cormack et al. 2009). Chunks
+  appearing in both lists score significantly higher.
+- **Graceful degradation:** if Gemini embedding fails for any reason
+  (missing key, timeout, rate limit), the system silently returns
+  BM25-only results. No error is surfaced to the caller.
+
+**Why not embed a small curated subset at index time?**
+Considered, but deferred. The embedding path's main value is semantic
+query understanding, which requires only a query vector, not a
+pre-embedded corpus. Adding "golden FAQ" chunk embedding would help
+recall but reintroduces the quota risk and requires a separate
+curation step. Left as a future option (see ROADMAP).
+
+**Files changed this session:**
+
+| File | Change |
+|---|---|
+| `app/rag/hybrid_retriever.py` | **New.** `HybridRetriever` class with `search_bm25`, `search_embeddings`, `fuse_results`, `search` methods. |
+| `app/rag/pipeline.py` | Now calls `HybridRetriever.search()` instead of `BM25Index.search()` directly. API surface unchanged; two new boolean fields added to the return dict (`used_bm25`, `used_embeddings`). |
+| `app/rag/__init__.py` | Docstring updated to reflect current architecture. |
+| `app/chatbot.py` | Module docstring updated; fallback error strings no longer mention "Qdrant". |
+| `docs/RAG_CHATBOT.md` | Full rewrite: now describes BM25 + hybrid, not the old Gemini + Qdrant indexing. |
+| `ROADMAP.md` | Status table updated; hybrid retrieval row added. |
+| `backend/tests/test_bm25_store.py` | **New.** 19 unit tests for `BM25Index` (ranking, persistence, IDF, cache). |
+| `backend/tests/test_hybrid_retriever.py` | **New.** 21 tests across 4 classes: BM25-only, embedding-only (Gemini + vector_store mocked), RRF fusion, graceful degradation. |
+
+**Trade-offs acknowledged:**
+
+- `app/rag/vector_store.py` and the embedding helpers in
+  `gemini_client.py` are now partially legacy code. They're kept
+  because `HybridRetriever.search_embeddings()` uses them for the
+  optional embedding path. Removing them would break that path.
+- The Qdrant vector index is empty in the current deployment (no
+  chunks have been upserted since switching to BM25). The embedding
+  arm of hybrid search will return empty results until Qdrant is
+  seeded with chunk vectors. This is by design — the BM25 arm always
+  provides results, so the overall system remains fully functional.
+- Test count: 103 → 143 (40 new tests, all passing). The two
+  pre-existing failures (`test_knowledge_base::test_load_documents_finds_all_sop_files`
+  and `test_ml_models::test_priority_model_predicts_a_real_level`) are
+  unchanged sandbox-environment issues (filename mismatch and missing
+  `xgboost`), not caused by this session's changes.
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
