@@ -67,21 +67,48 @@ def _headers():
 
 
 def _raise_with_body(e: requests.RequestException, action: str):
-    """Wraps a requests error, including the actual response body if
-    there is one - Google's error responses put the real reason
-    (INVALID_ARGUMENT vs. FAILED_PRECONDITION vs. PERMISSION_DENIED,
-    etc.) in the JSON body, which `str(HTTPError)` alone does NOT
-    include (it only gives the status line, e.g. "400 Client Error:
-    Bad Request for url: ..."). Without this, a 400 with a billing/
-    region problem and a 400 with a malformed request look identical
-    in the admin chatbot UI and in logs - see docs/DECISIONS.md #24."""
-    body = ""
-    if getattr(e, "response", None) is not None:
+    """Surface a clean, screenshot-friendly error from a Gemini HTTP
+    failure. 5xx errors (overload, unavailable) get a short human
+    message. 4xx errors include the response body so the real cause
+    is visible (bad request shape, quota exhausted, region block, etc.)
+    See docs/DECISIONS.md #24 and #30."""
+    resp = getattr(e, "response", None)
+    if resp is not None:
         try:
-            body = f" | response body: {e.response.text}"
+            status = resp.status_code
+            body = resp.json()
+            err_msg = body.get("error", {}).get("message", "")
+
+            if status >= 500:
+                # 5xx = Gemini-side problem (overload, maintenance).
+                # Show a short human message, not a wall of JSON.
+                short = err_msg.split(".")[0] if err_msg else "service temporarily unavailable"
+                raise GeminiError(
+                    f"Gemini is temporarily unavailable — {short.lower().strip()}. "
+                    f"Please try again in a moment."
+                ) from e
+
+            if status == 429:
+                # Rate limited — extract the retry delay if present
+                retry_hint = ""
+                for detail in body.get("error", {}).get("details", []):
+                    if "retryDelay" in detail:
+                        retry_hint = f" Retry after {detail['retryDelay']}."
+                        break
+                raise GeminiError(
+                    f"Gemini rate limit reached.{retry_hint} "
+                    f"Check your quota at https://ai.dev/rate-limit"
+                ) from e
+
+            # 4xx other than 429: include the body so the real cause is visible
+            raise GeminiError(
+                f"Gemini {action} failed ({status}): {err_msg or resp.text[:300]}"
+            ) from e
+        except GeminiError:
+            raise
         except Exception:
             pass
-    raise GeminiError(f"Gemini {action} request failed: {e}{body}") from e
+    raise GeminiError(f"Gemini {action} request failed: {e}") from e
 
 
 def generate_text(prompt: str, system_instruction: str = None) -> str:
