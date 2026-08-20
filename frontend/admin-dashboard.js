@@ -491,7 +491,7 @@ function renderTable(items, readOnly = false) {
       <td class="ticket-no">#${c.ticket_no}</td>
       <td>${categoryCell}</td>
       <td>${priorityCell}</td>
-      <td class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(c.complaint)}</td>
+      <td><div class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(c.complaint)}</div></td>
       <td>${escapeHtml(c.date_month_year)}</td>
       <td>${escapeHtml(c.city||'—')}</td>
       <td>${escapeHtml(c.received_via)}</td>
