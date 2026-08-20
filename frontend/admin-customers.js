@@ -1,158 +1,218 @@
 // ==========================================================================
-// Loopline — admin customers page logic
-// Requires config.js, admin.js loaded first.
+// Loopline — admin-customers.js
+// Customer account list + profile modal for the admin portal.
+// Requires config.js (API_BASE) and admin.js (adminFetch,
+// adminGuardAndWireNav) to be loaded first.
 // ==========================================================================
 
 'use strict';
 
-// ─── State ───────────────────────────────────────────────────────────────────
-let _page     = 1;
-const PAGE_SIZE = 20;
-let _search   = '';
+// ─── State ────────────────────────────────────────────────────────────────────
+let _page          = 1;
+const PAGE_SIZE    = 20;
+let _search        = '';
 let _debounceTimer = null;
+// Cache the full page response so stat cards can be computed client-side.
+let _lastData      = null;
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = (str == null) ? '' : String(str);
+  return d.innerHTML;
 }
 
-function statusClassFor(status) {
-  return ['Resolved', 'Closed'].includes(status) ? 'resolved' : 'pending';
+function statusClassFor(s) {
+  return ['Resolved', 'Closed'].includes(s) ? 'resolved' : 'pending';
 }
 
-function priorityClassFor(priority) {
-  return (priority || 'low').toLowerCase();
+function priorityClassFor(p) {
+  return (p || 'low').toLowerCase();
 }
 
-function formatDate(iso) {
+/** Format an ISO date string to YYYY-MM-DD, gracefully. */
+function fmtDate(iso) {
   if (!iso) return '—';
-  // Show just the date portion (YYYY-MM-DD) regardless of timezone offset
-  return iso.slice(0, 10);
+  return String(iso).slice(0, 10);
 }
 
-// ─── Load + render customer list ─────────────────────────────────────────────
+// ─── Stat cards ───────────────────────────────────────────────────────────────
+function updateStatCards(data) {
+  const total = data.total;
+  const open  = data.items.filter(u => u.complaint_count > 0).length;
+  // "none" is approximate for the current page; for full accuracy we'd need
+  // a separate API call. Good enough for a summary.
+  const none  = data.items.filter(u => u.complaint_count === 0).length;
+
+  document.getElementById('stat-total').textContent = total;
+  // Show page-scoped numbers with a note when paginated
+  const suffix = total > PAGE_SIZE ? '*' : '';
+  document.getElementById('stat-open').textContent = open + suffix;
+  document.getElementById('stat-none').textContent = none + suffix;
+}
+
+// ─── Customer list ────────────────────────────────────────────────────────────
 async function loadCustomers() {
   const tbody   = document.getElementById('cust-tbody');
   const emptyEl = document.getElementById('cust-empty');
   const loadEl  = document.getElementById('cust-loading');
-  const pagBar  = document.getElementById('cust-pagination');
+  const pagEl   = document.getElementById('cust-pagination');
 
-  tbody.innerHTML = '';
+  tbody.innerHTML   = '';
   emptyEl.style.display = 'none';
   loadEl.style.display  = 'block';
-  pagBar.style.display  = 'none';
+  pagEl.style.display   = 'none';
 
   const params = new URLSearchParams({ page: _page, page_size: PAGE_SIZE });
   if (_search.trim()) params.set('search', _search.trim());
 
   try {
     const data = await adminFetch(`/admin/customers?${params}`);
+    _lastData = data;
     loadEl.style.display = 'none';
 
+    updateStatCards(data);
+
     if (!data.items.length) {
+      emptyEl.textContent   = _search ? 'No customers match your search.' : 'No customer accounts yet.';
       emptyEl.style.display = 'block';
       return;
     }
 
     data.items.forEach(u => {
       const tr = document.createElement('tr');
+      const countClass = u.complaint_count === 0 ? 'zero' : '';
       tr.innerHTML = `
-        <td class="ticket-no" style="font-family:var(--font-mono);">#${u.user_id}</td>
-        <td><strong>${escapeHtml(u.username)}</strong></td>
-        <td style="color:var(--ink-faint); font-size:0.88rem;">${escapeHtml(u.email)}</td>
-        <td style="font-size:0.85rem; color:var(--ink-faint); font-family:var(--font-mono);">${formatDate(u.joined)}</td>
-        <td>
-          <span class="inline-label ${u.complaint_count > 0 ? '' : 'resolved'}"
-                style="min-width:2rem; text-align:center;">
-            ${u.complaint_count}
-          </span>
-        </td>
+        <td style="font-family:var(--font-mono); color:var(--ink-faint); font-size:0.85rem;">#${u.user_id}</td>
+        <td style="font-weight:600;">${escapeHtml(u.username)}</td>
+        <td style="color:var(--ink-faint); font-size:0.875rem;">${escapeHtml(u.email)}</td>
+        <td style="font-family:var(--font-mono); font-size:0.82rem; color:var(--ink-faint);">${fmtDate(u.joined)}</td>
+        <td><span class="count-badge ${countClass}">${u.complaint_count}</span></td>
         <td>
           <button type="button" class="row-btn row-btn-view"
                   data-action="view-customer"
                   data-userid="${u.user_id}"
                   data-username="${escapeHtml(u.username)}">
-            👤 View
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+                 style="width:12px;height:12px;margin-right:4px;vertical-align:-1px;">
+              <circle cx="8" cy="6" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>View
           </button>
         </td>
       `;
       tbody.appendChild(tr);
     });
 
-    // Wire view buttons
-    tbody.querySelectorAll('[data-action="view-customer"]').forEach(btn => {
-      btn.addEventListener('click', () =>
-        openCustomerModal(Number(btn.dataset.userid), btn.dataset.username)
-      );
-    });
+    // Event delegation — single listener on tbody
+    tbody.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="view-customer"]');
+      if (btn) openCustomerModal(Number(btn.dataset.userid), btn.dataset.username);
+    }, { once: false });
 
     // Pagination
     const totalPages = Math.max(1, Math.ceil(data.total / data.page_size));
     document.getElementById('cust-page-info').textContent =
-      `Page ${data.page} of ${totalPages} (${data.total} customer${data.total !== 1 ? 's' : ''})`;
+      `Page ${data.page} of ${totalPages}`;
     document.getElementById('cust-prev').disabled = data.page <= 1;
     document.getElementById('cust-next').disabled = data.page >= totalPages;
-    pagBar.style.display = 'flex';
+    pagEl.style.display = 'flex';
 
-  } catch (e) {
-    loadEl.style.display = 'none';
-    emptyEl.textContent  = e.message || 'Failed to load customers.';
+  } catch (err) {
+    loadEl.style.display  = 'none';
+    emptyEl.textContent   = err.message || 'Failed to load customers.';
     emptyEl.style.display = 'block';
   }
 }
 
 // ─── Customer detail modal ────────────────────────────────────────────────────
 async function openCustomerModal(userId, username) {
-  document.getElementById('cust-modal-title').textContent = `Customer: ${username}`;
-  document.getElementById('cust-modal-body').innerHTML =
-    '<p style="color:var(--ink-faint); padding:1rem 0;">Loading…</p>';
-  document.getElementById('cust-modal').classList.add('open');
+  const modal    = document.getElementById('cust-modal');
+  const titleEl  = document.getElementById('cust-modal-title');
+  const bodyEl   = document.getElementById('cust-modal-body');
+
+  titleEl.textContent = username;
+  bodyEl.innerHTML    = '<p style="color:var(--ink-faint);padding:2rem 0;text-align:center;">Loading…</p>';
+  modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 
   try {
     const data = await adminFetch(`/admin/customers/${userId}`);
     renderCustomerModal(data);
-  } catch (e) {
-    document.getElementById('cust-modal-body').innerHTML =
-      `<p style="color:var(--danger);">${escapeHtml(e.message || 'Failed to load customer details.')}</p>`;
+  } catch (err) {
+    bodyEl.innerHTML =
+      `<p style="color:var(--danger);padding:1rem 0;">${escapeHtml(err.message || 'Could not load profile.')}</p>`;
   }
 }
 
 function renderCustomerModal(data) {
-  const u = data.user;
+  const u          = data.user;
   const complaints = data.complaints;
-
-  // Summary counts
   const pending    = complaints.filter(c => c.status === 'Pending').length;
   const inProgress = complaints.filter(c => c.status === 'In Progress').length;
 
-  // Profile block
-  let html = `
-    <div class="view-grid" style="margin-bottom:1.25rem;">
-      <div><strong>User ID</strong><div style="font-family:var(--font-mono);">#${u.user_id}</div></div>
-      <div><strong>Username</strong><div>${escapeHtml(u.username)}</div></div>
-      <div><strong>Email</strong><div style="font-size:0.9rem;">${escapeHtml(u.email)}</div></div>
-      <div><strong>Joined</strong><div style="font-family:var(--font-mono); font-size:0.88rem;">${formatDate(u.joined)}</div></div>
-      <div><strong>Total complaints</strong><div>${u.complaint_count}</div></div>
-      <div><strong>Open</strong>
-        <div>
-          <span class="inline-label pending" style="margin-right:4px;">${pending} Pending</span>
-          <span class="inline-label pending">${inProgress} In Progress</span>
+  // ── Profile grid ──────────────────────────────────────────────
+  const grid = `
+    <div class="cust-profile-grid">
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">User ID</div>
+        <div class="cust-profile-value mono">#${u.user_id}</div>
+      </div>
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">Username</div>
+        <div class="cust-profile-value">${escapeHtml(u.username)}</div>
+      </div>
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">Email</div>
+        <div class="cust-profile-value">${escapeHtml(u.email)}</div>
+      </div>
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">Joined</div>
+        <div class="cust-profile-value mono">${fmtDate(u.joined)}</div>
+      </div>
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">Total Complaints</div>
+        <div class="cust-profile-value">${u.complaint_count}</div>
+      </div>
+      <div class="cust-profile-cell">
+        <div class="cust-profile-label">Open Issues</div>
+        <div class="cust-profile-value">
+          <div class="cust-open-pills">
+            <span class="status-badge ${pending > 0 ? 'pending' : ''}"
+                  style="${pending === 0 ? 'opacity:.45;' : ''}">${pending} Pending</span>
+            <span class="status-badge ${inProgress > 0 ? 'pending' : ''}"
+                  style="${inProgress === 0 ? 'opacity:.45;' : ''}">${inProgress} In Progress</span>
+          </div>
         </div>
       </div>
     </div>
   `;
 
-  // Complaints table
+  // ── Complaints table ───────────────────────────────────────────
+  let table = '';
   if (!complaints.length) {
-    html += `<p style="color:var(--ink-faint); font-size:0.9rem;">No complaints filed by this customer.</p>`;
+    table = `<div class="cust-modal-empty">No complaints filed by this customer.</div>`;
   } else {
-    html += `
-      <h3 style="font-size:0.9rem; font-weight:600; color:var(--ink-faint); text-transform:uppercase;
-                 letter-spacing:.05em; margin:0 0 0.75rem;">Complaints (${complaints.length})</h3>
+    const rows = complaints.map(c => {
+      const snippet = c.complaint.length > 55
+        ? c.complaint.slice(0, 55) + '…'
+        : c.complaint;
+      return `
+        <tr>
+          <td class="ticket-no">#${c.ticket_no}</td>
+          <td><span class="inline-label">${escapeHtml(c.category)}</span></td>
+          <td><span class="priority-badge ${priorityClassFor(c.priority)}">${escapeHtml(c.priority)}</span></td>
+          <td><span class="status-badge ${statusClassFor(c.status)}">${escapeHtml(c.status)}</span></td>
+          <td style="font-family:var(--font-mono);font-size:0.8rem;color:var(--ink-faint);">${escapeHtml(c.date_month_year)}</td>
+          <td class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(snippet)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    table = `
+      <p class="cust-section-head">Complaints (${complaints.length})</p>
       <div style="overflow-x:auto;">
-        <table class="complaint-table" style="min-width:560px;">
+        <table class="complaint-table cust-modal-table" style="min-width:520px;">
           <thead>
             <tr>
               <th>Ticket</th>
@@ -163,27 +223,13 @@ function renderCustomerModal(data) {
               <th>Summary</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     `;
-    complaints.forEach(c => {
-      const snippet = c.complaint.length > 60
-        ? c.complaint.slice(0, 60) + '…'
-        : c.complaint;
-      html += `
-        <tr>
-          <td class="ticket-no" style="font-family:var(--font-mono);">#${c.ticket_no}</td>
-          <td><span class="inline-label">${escapeHtml(c.category)}</span></td>
-          <td><span class="priority-badge ${priorityClassFor(c.priority)}">${escapeHtml(c.priority)}</span></td>
-          <td><span class="status-badge ${statusClassFor(c.status)}">${escapeHtml(c.status)}</span></td>
-          <td style="font-size:0.82rem; font-family:var(--font-mono); color:var(--ink-faint);">${escapeHtml(c.date_month_year)}</td>
-          <td class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(snippet)}</td>
-        </tr>
-      `;
-    });
-    html += `</tbody></table></div>`;
   }
 
-  document.getElementById('cust-modal-body').innerHTML = html;
+  document.getElementById('cust-modal-body').innerHTML = grid + table;
 }
 
 function closeCustomerModal() {
@@ -197,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadCustomers();
 
-  // Search — debounced
+  // Search — debounced 350 ms, same as dashboard
   document.getElementById('cust-search').addEventListener('input', e => {
     clearTimeout(_debounceTimer);
     _debounceTimer = setTimeout(() => {
@@ -214,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCustomers();
   });
 
-  // Pagination
   document.getElementById('cust-prev').addEventListener('click', () => {
     if (_page > 1) { _page--; loadCustomers(); }
   });
@@ -223,14 +268,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCustomers();
   });
 
-  // Modal close
+  // Modal close — button, backdrop click, ESC
   document.getElementById('cust-modal-close').addEventListener('click', closeCustomerModal);
   document.getElementById('cust-modal-close-btn').addEventListener('click', closeCustomerModal);
   document.getElementById('cust-modal').addEventListener('click', e => {
     if (e.target.id === 'cust-modal') closeCustomerModal();
   });
-
-  // ESC key
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeCustomerModal();
   });
