@@ -134,3 +134,36 @@ doesn't exist.
 
 Legend: 🔒 = requires a valid session token (any role). 👑 = requires
 `role: "admin"` specifically (403 for a valid customer token).
+
+### `GET /admin/customers` 🔒👑
+Query params: `search` (string, optional — matches username or email, case-insensitive), `page` (int, default 1), `page_size` (int, default 20, max 100).
+
+→ `AdminCustomerListOut`:
+```json
+{
+  "items": [
+    {
+      "user_id": 12,
+      "username": "aung_min",
+      "email": "aung@example.com",
+      "joined": "2026-03-15T08:22:11+00:00",
+      "role": "customer",
+      "complaint_count": 3
+    }
+  ],
+  "total": 47,
+  "page": 1,
+  "page_size": 20
+}
+```
+Only users with `role == "customer"` are returned. Admin accounts are never exposed here.
+
+### `GET /admin/customers/{user_id}` 🔒👑
+→ `AdminCustomerDetailOut`:
+```json
+{
+  "user": { ...AdminCustomerOut fields... },
+  "complaints": [ ...ComplaintOut objects, newest first... ]
+}
+```
+`404` if `user_id` does not exist or belongs to an admin account. Password hashes are never included in any response.

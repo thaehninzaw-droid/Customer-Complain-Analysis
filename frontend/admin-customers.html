@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Accounts — Loopline Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="admin-dashboard.html" class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="13" cy="13" r="12" stroke="#2C5F63" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="#3F8489" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline<span class="admin-tag">Admin</span>
+    </a>
+    <div class="nav-links">
+      <a href="admin-dashboard.html">Dashboard</a>
+      <a href="admin-customers.html" style="color:var(--teal-dark); font-weight:600;">Customers</a>
+      <a href="admin-chatbot.html">AI Chatbot</a>
+    </div>
+    <div class="nav-auth">
+      <div class="nav-account">
+        <span>Hi, <span id="admin-name">Admin</span></span>
+        <button class="btn btn-ghost btn-sm" id="admin-logout">Log out</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="activities-wrap">
+  <div class="container">
+
+    <div class="activities-header">
+      <span class="eyebrow">Admin portal</span>
+      <h1>Customer Accounts</h1>
+      <p style="margin-bottom:0;">Searchable list of registered customer accounts and their linked complaints.</p>
+    </div>
+
+    <!-- Search bar -->
+    <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+      <input
+        type="search"
+        id="cust-search"
+        placeholder="Search by username or email…"
+        class="filter-input"
+        style="flex:1; min-width:220px; max-width:420px;"
+      >
+      <button class="btn btn-ghost btn-sm" id="cust-search-clear" style="white-space:nowrap;">Clear</button>
+    </div>
+
+    <!-- Customer list table -->
+    <div class="table-wrap" id="cust-table-wrap">
+      <table class="complaint-table" id="cust-table">
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Joined</th>
+            <th>Complaints</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cust-tbody"></tbody>
+      </table>
+      <div id="cust-empty" class="table-empty" style="display:none;">No customers found.</div>
+      <div id="cust-loading" class="table-empty">Loading…</div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-bar" id="cust-pagination" style="display:none;">
+      <button class="btn btn-ghost btn-sm" id="cust-prev">← Prev</button>
+      <span id="cust-page-info" style="font-size:0.85rem; color:var(--ink-faint); font-family:var(--font-mono);"></span>
+      <button class="btn btn-ghost btn-sm" id="cust-next">Next →</button>
+    </div>
+
+  </div>
+</main>
+
+<!-- Customer detail modal -->
+<div class="modal-overlay" id="cust-modal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-head">
+      <h2 id="cust-modal-title">Customer Profile</h2>
+      <button class="modal-close" id="cust-modal-close" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+          <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" id="cust-modal-body" style="max-height:72vh; overflow-y:auto;"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="cust-modal-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="admin.js"></script>
+<script src="admin-customers.js"></script>
+</body>
+</html>
