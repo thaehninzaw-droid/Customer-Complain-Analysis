@@ -487,6 +487,26 @@ def admin_ml_status(admin_id: int = Depends(get_current_admin_id)):
 
 
 # --------------------------------------------------------- admin: customers ----
+# Performance model:
+#   - Users collection is small (O(100s) rows max for a thesis demo).
+#     Full scan is fine; the result is filtered + sorted in Python.
+#   - Complaint counts for the list view: one targeted query filtered
+#     to the page_ids currently on screen — O(page_size) not O(N).
+#   - Detail view: one find({user_id}) — O(user_complaints), no global scan.
+#   No ORM, no extra library — consistent with the rest of the codebase.
+
+def _build_customer_out(u: dict, complaint_count: int) -> AdminCustomerOut:
+    """Single place that maps a raw users document to AdminCustomerOut,
+    so we never accidentally include password_hash or other raw fields."""
+    return AdminCustomerOut(
+        user_id=u["user_id"],
+        username=u["username"],
+        email=u["email"],
+        joined=u.get("joined", ""),
+        role=u.get("role", "customer"),
+        complaint_count=complaint_count,
+    )
+
 
 @app.get("/admin/customers", response_model=AdminCustomerListOut)
 def list_customers_admin(
@@ -495,19 +515,14 @@ def list_customers_admin(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """Paginated list of customer accounts for the admin portal.
-    Only returns users with role == 'customer' — admin accounts are
-    never exposed here. complaint_count is computed inline from the
-    complaints collection, same in-Python style as the rest of the
-    codebase."""
+    # 1. Filter customers only — one pass, never exposes admin rows.
     users = [u for u in get_collection("users").find() if u.get("role") == "customer"]
 
     if search:
         sl = search.strip().lower()
-        users = [
-            u for u in users
-            if sl in u.get("username", "").lower() or sl in u.get("email", "").lower()
-        ]
+        users = [u for u in users
+                 if sl in u.get("username", "").lower()
+                 or sl in u.get("email", "").lower()]
 
     users.sort(key=lambda u: u.get("joined", ""), reverse=True)
 
@@ -515,60 +530,42 @@ def list_customers_admin(
     start = (page - 1) * page_size
     page_users = users[start:start + page_size]
 
-    # Count complaints per user in one pass over the complaints collection.
-    all_complaints = list(get_collection("complaints").find())
-    counts: dict = {}
-    for c in all_complaints:
-        uid = c.get("user_id")
-        if uid:
-            counts[uid] = counts.get(uid, 0) + 1
+    # 2. Count complaints only for the users visible on this page.
+    #    One targeted query rather than scanning every complaint.
+    page_ids = [u["user_id"] for u in page_users]
+    counts: dict[int, int] = {uid: 0 for uid in page_ids}
+    if page_ids:
+        for c in get_collection("complaints").find({"user_id": {"$in": page_ids}}, {"user_id": 1}):
+            uid = c.get("user_id")
+            if uid in counts:
+                counts[uid] += 1
 
-    items = [
-        AdminCustomerOut(
-            user_id=u["user_id"],
-            username=u["username"],
-            email=u["email"],
-            joined=u.get("joined", ""),
-            role=u.get("role", "customer"),
-            complaint_count=counts.get(u["user_id"], 0),
-        )
-        for u in page_users
-    ]
-
-    return AdminCustomerListOut(items=items, total=total, page=page, page_size=page_size)
+    return AdminCustomerListOut(
+        items=[_build_customer_out(u, counts.get(u["user_id"], 0)) for u in page_users],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @app.get("/admin/customers/{user_id}", response_model=AdminCustomerDetailOut)
 def get_customer_admin(user_id: int, admin_id: int = Depends(get_current_admin_id)):
-    """Full customer profile + their complaints. Returns 404 if the
-    user does not exist or is an admin account."""
     user = get_collection("users").find_one({"user_id": user_id})
     if not user or user.get("role") != "customer":
         raise HTTPException(status_code=404, detail=f"Customer {user_id} not found.")
 
-    complaints = list(get_collection("complaints").find({"user_id": user_id}))
-    complaints.sort(key=lambda c: c.get("ticket_no", 0), reverse=True)
-
-    all_complaints = list(get_collection("complaints").find())
-    counts: dict = {}
-    for c in all_complaints:
-        uid = c.get("user_id")
-        if uid:
-            counts[uid] = counts.get(uid, 0) + 1
-
-    customer_out = AdminCustomerOut(
-        user_id=user["user_id"],
-        username=user["username"],
-        email=user["email"],
-        joined=user.get("joined", ""),
-        role=user.get("role", "customer"),
-        complaint_count=counts.get(user["user_id"], 0),
+    # One targeted query — complaint_count == len(result), no second scan.
+    complaints = sorted(
+        get_collection("complaints").find({"user_id": user_id}),
+        key=lambda c: c.get("ticket_no", 0),
+        reverse=True,
     )
 
     return AdminCustomerDetailOut(
-        user=customer_out,
+        user=_build_customer_out(user, len(complaints)),
         complaints=[_to_complaint_out(c) for c in complaints],
     )
+
 
 
 # ------------------------------------------------------------- chatbot ----

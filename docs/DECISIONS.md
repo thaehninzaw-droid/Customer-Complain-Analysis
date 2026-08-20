@@ -1268,6 +1268,135 @@ curation step. Left as a future option (see ROADMAP).
 
 ---
 
+## Decision 31: Backend query optimisation + frontend design system consistency for admin-customers
+
+**Context (the problems found after initial shipping):**
+
+After the customer accounts feature (Decision 30 session) shipped, two
+classes of problems were identified from live usage:
+
+*Backend:* `GET /admin/customers` fetched every complaint in the
+collection to build counts, then discarded all but the page_size
+entries (default 20). `GET /admin/customers/{user_id}` did the same
+redundant full scan a second time just to count one user's complaints.
+Both endpoints also materialised the full complaint documents when only
+`user_id` was needed for the count step.
+
+*Frontend:* The customers page was missing the page-level header, the
+search bar was floating outside any container, the complaint-count
+badge used inconsistent styling (0 got an outline circle while non-zero
+got a filled circle), the View button used an emoji instead of the SVG
+icon pattern used elsewhere, and the modal profile layout used a CSS
+grid that broke at small widths.
+
+---
+
+**Backend changes — what and why:**
+
+**1. Projection on the count query.**
+`GET /admin/customers` now passes `{"user_id": 1}` as the projection
+argument to `.find()`. MongoDB (and the in-memory fallback) return only
+the `user_id` field from each matching complaint document instead of
+the full complaint text, category, and all other fields. For 2315
+seeded complaints this cuts the data transferred per page load by
+roughly 98%.
+
+**2. Page-scoped count query.**
+The complaint count query is now filtered to `{"user_id": {"$in":
+page_ids}}` where `page_ids` contains only the ≤20 user IDs visible on
+the current page. Previously it fetched all complaints regardless of
+which users were on screen.
+
+**3. `_build_customer_out` helper.**
+Extracted a single function that maps a raw `users` document to
+`AdminCustomerOut`. This ensures `password_hash` and any other raw
+fields can never accidentally appear in the response regardless of
+future changes to the `users` document shape.
+
+**4. `GET /admin/customers/{user_id}` — removed double scan.**
+The detail endpoint previously fetched all complaints (for counting)
+and then fetched the same user's complaints again (for the response).
+It now does one targeted `.find({"user_id": user_id})` and uses
+`len(complaints)` for the count, eliminating the second query entirely.
+
+**Asymptotic improvement:**
+
+| Endpoint | Before | After |
+|---|---|---|
+| List — complaint data fetched | O(N_complaints) full docs | O(page_complaints) × projection only |
+| Detail — DB queries | 2 (full scan + targeted) | 1 (targeted) |
+
+At the current dataset size (~2300 complaints, 6 customers) the wall
+time improvement is small but the pattern is correct and will not
+degrade as data grows.
+
+---
+
+**Frontend changes — what and why:**
+
+**1. Page header restored.**
+The `activities-header` block (eyebrow + h1 + subtitle) was missing
+from the customers page, leaving the page with no visual context. Added
+to match the exact structure of the activities and dashboard pages.
+
+**2. Summary stat cards.**
+Three `summary-card` elements (Total Customers, With Open Complaints,
+No Complaints) added above the table card using the existing
+`.summary-cards` grid and `.summary-card` classes. These populate from
+the API response client-side with no extra request.
+
+**3. Table wrapped in `.card.table-card`.**
+The table was floating without a container. Now wrapped in the same
+`<section class="card table-card">` scaffold the dashboard uses,
+giving it the correct white background, border-radius, and shadow.
+
+**4. Filter bar uses existing `.filter-bar` / `.search-wrap` classes.**
+The previous search bar used ad-hoc inline styles. Now uses the exact
+same `.filter-bar` + `.search-wrap` + `.search-icon` + `.filter-clear`
+classes as the dashboard, so styling is inherited automatically and any
+future style updates apply everywhere.
+
+**5. Complaint-count badge.**
+Replaced the `inline-label` (intended for text labels like "Billing")
+with a new `.count-badge` class scoped to this page. Zero counts get
+`.count-badge.zero` (muted grey) and non-zero get the teal version.
+This removes the inconsistency where 0 rendered differently from 1+.
+
+**6. View button SVG icon.**
+Replaced the 👤 emoji with a 12×12 SVG person-outline icon matching
+the `.row-btn-view` eye icon pattern on the dashboard.
+
+**7. Modal profile grid.**
+Replaced the `view-grid` (used for complaint details, 2-column label/
+value) with a new `cust-profile-grid` using a border-table layout:
+each field is a bordered cell with a small-caps label above a value.
+This is consistent with how profile information is displayed on the
+activities page and is responsive (collapses to 1 column on mobile via
+a scoped `@media` rule).
+
+**8. Open issues display.**
+"Pending" and "In Progress" counts in the modal now render as
+`status-badge` pills at reduced opacity (0.45) when zero, rather than
+always showing the full amber colour. This visually communicates "none"
+without removing the information.
+
+**9. Event delegation on the tbody.**
+The previous code called `querySelectorAll('[data-action]').forEach(...
+addEventListener)` after every render, attaching N listeners for N
+rows. Replaced with a single `click` listener on `tbody` that checks
+`e.target.closest('[data-action]')` — one listener regardless of row
+count, no memory leak on re-render.
+
+**Files changed:**
+
+| File | Change |
+|---|---|
+| `backend/app/main.py` | `_build_customer_out` helper; projection on count query; single-query detail endpoint |
+| `frontend/admin-customers.html` | Header, stat cards, table-card wrapper, filter-bar, pagination using existing CSS classes |
+| `frontend/admin-customers.js` | Stat card update; count-badge class; SVG icon; `cust-profile-grid` modal; `cust-open-pills`; event delegation |
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:

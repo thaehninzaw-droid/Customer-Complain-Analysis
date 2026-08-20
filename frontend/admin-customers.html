@@ -7,6 +7,123 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+  /* ── Customer page local styles ───────────────────────────────── */
+
+  /* Stat bar above the table card */
+  .cust-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  /* Count badge in the table — neutral pill */
+  .count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    background: var(--teal-tint);
+    color: var(--teal-dark);
+    letter-spacing: 0;
+  }
+  .count-badge.zero {
+    background: var(--bg-alt);
+    color: var(--ink-faint);
+  }
+
+  /* Customer row — pointer affordance */
+  #cust-tbody tr {
+    cursor: default;
+  }
+
+  /* Modal profile grid — 2-col label/value pairs */
+  .cust-profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .cust-profile-cell {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .cust-profile-cell:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+  .cust-profile-cell:nth-child(odd) {
+    border-right: 1px solid var(--line);
+  }
+  .cust-profile-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-faint);
+    margin-bottom: 4px;
+  }
+  .cust-profile-value {
+    font-size: 0.92rem;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .cust-profile-value.mono {
+    font-family: var(--font-mono);
+    font-weight: 400;
+  }
+
+  /* Open issues pill strip in the modal */
+  .cust-open-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  /* Modal section heading */
+  .cust-section-head {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+
+  /* Tighter complaint rows inside modal */
+  .cust-modal-table td {
+    padding: 10px 12px;
+  }
+  .cust-modal-table .ticket-no {
+    font-size: 0.85rem;
+  }
+
+  /* Empty state inside modal */
+  .cust-modal-empty {
+    text-align: center;
+    padding: 36px 0;
+    color: var(--ink-faint);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 600px) {
+    .cust-stats { grid-template-columns: 1fr 1fr; }
+    .cust-profile-grid { grid-template-columns: 1fr; }
+    .cust-profile-cell:nth-child(odd) { border-right: none; }
+    .cust-profile-cell:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
+    .cust-profile-cell:last-child { border-bottom: none; }
+  }
+</style>
 </head>
 <body>
 
@@ -39,53 +156,81 @@
     <div class="activities-header">
       <span class="eyebrow">Admin portal</span>
       <h1>Customer Accounts</h1>
-      <p style="margin-bottom:0;">Searchable list of registered customer accounts and their linked complaints.</p>
+      <p style="margin-bottom:0; color:var(--ink-faint);">
+        Registered customers, their contact details, and linked complaint history.
+      </p>
     </div>
 
-    <!-- Search bar -->
-    <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;">
-      <input
-        type="search"
-        id="cust-search"
-        placeholder="Search by username or email…"
-        class="filter-input"
-        style="flex:1; min-width:220px; max-width:420px;"
-      >
-      <button class="btn btn-ghost btn-sm" id="cust-search-clear" style="white-space:nowrap;">Clear</button>
+    <!-- Summary stat cards -->
+    <div class="cust-stats">
+      <div class="summary-card total">
+        <span class="summary-label">Total Customers</span>
+        <span class="summary-value" id="stat-total">–</span>
+      </div>
+      <div class="summary-card pending">
+        <span class="summary-label">With Open Complaints</span>
+        <span class="summary-value" id="stat-open">–</span>
+      </div>
+      <div class="summary-card resolved">
+        <span class="summary-label">No Complaints</span>
+        <span class="summary-value" id="stat-none">–</span>
+      </div>
     </div>
 
-    <!-- Customer list table -->
-    <div class="table-wrap" id="cust-table-wrap">
-      <table class="complaint-table" id="cust-table">
-        <thead>
-          <tr>
-            <th>User ID</th>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Joined</th>
-            <th>Complaints</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="cust-tbody"></tbody>
-      </table>
-      <div id="cust-empty" class="table-empty" style="display:none;">No customers found.</div>
-      <div id="cust-loading" class="table-empty">Loading…</div>
-    </div>
+    <!-- Table card -->
+    <section class="card table-card">
+      <div class="table-head">
+        <div>
+          <h3>All Customers</h3>
+          <p style="margin:4px 0 0; font-size:0.88rem; color:var(--ink-faint);">
+            Search by username or email. Click <strong>View</strong> for full profile and complaints.
+          </p>
+        </div>
+      </div>
 
-    <!-- Pagination -->
-    <div class="pagination-bar" id="cust-pagination" style="display:none;">
-      <button class="btn btn-ghost btn-sm" id="cust-prev">← Prev</button>
-      <span id="cust-page-info" style="font-size:0.85rem; color:var(--ink-faint); font-family:var(--font-mono);"></span>
-      <button class="btn btn-ghost btn-sm" id="cust-next">Next →</button>
-    </div>
+      <!-- Filter bar — same pattern as dashboard -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="7" r="5.25" stroke="#8695A4" stroke-width="1.5"/>
+            <path d="M11 11L14 14" stroke="#8695A4" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="cust-search" placeholder="Search username or email…">
+        </div>
+        <button class="filter-clear" id="cust-search-clear">Clear</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="complaint-table" id="cust-table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Joined</th>
+              <th>Complaints</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="cust-tbody"></tbody>
+        </table>
+        <div id="cust-empty" class="table-empty" style="display:none;">No customers found.</div>
+        <div id="cust-loading" class="table-empty">Loading…</div>
+      </div>
+
+      <div class="pagination" id="cust-pagination" style="display:none;">
+        <button id="cust-prev">← Prev</button>
+        <span id="cust-page-info">Page 1</span>
+        <button id="cust-next">Next →</button>
+      </div>
+    </section>
 
   </div>
 </main>
 
 <!-- Customer detail modal -->
 <div class="modal-overlay" id="cust-modal">
-  <div class="modal" style="max-width:700px;">
+  <div class="modal" style="max-width:680px;">
     <div class="modal-head">
       <h2 id="cust-modal-title">Customer Profile</h2>
       <button class="modal-close" id="cust-modal-close" aria-label="Close">
@@ -94,7 +239,7 @@
         </svg>
       </button>
     </div>
-    <div class="modal-body" id="cust-modal-body" style="max-height:72vh; overflow-y:auto;"></div>
+    <div class="modal-body" id="cust-modal-body" style="max-height:74vh; overflow-y:auto; padding-top:4px;"></div>
     <div class="modal-foot">
       <button type="button" class="btn btn-ghost" id="cust-modal-close-btn">Close</button>
     </div>
