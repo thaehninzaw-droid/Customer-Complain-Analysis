@@ -118,6 +118,32 @@ class AdminComplaintListOut(BaseModel):
     page_size: int
 
 
+# ---- admin customers ----
+
+class AdminCustomerOut(BaseModel):
+    """One customer row in GET /admin/customers."""
+    user_id: int
+    username: str
+    email: str
+    joined: str
+    role: str
+    complaint_count: int
+
+
+class AdminCustomerListOut(BaseModel):
+    """Paginated response for GET /admin/customers."""
+    items: List[AdminCustomerOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdminCustomerDetailOut(BaseModel):
+    """Response for GET /admin/customers/{user_id}."""
+    user: AdminCustomerOut
+    complaints: List[ComplaintOut]
+
+
 # ---- chatbot ----
 
 class ChatbotRequest(BaseModel):

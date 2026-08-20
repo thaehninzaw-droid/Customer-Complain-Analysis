@@ -26,7 +26,7 @@ _raise_with_body() below, so next time this happens the actual reason
 from Google shows up directly in the admin chatbot UI).
 
 Model choice: defaults to `gemini-flash-latest`, a Google-maintained
-alias that always points at the current GA Flash model (gemini-3.5-flash
+current default. As of August 2026, free-tier quota: 15 RPM/1,000 RPD (4x higher than gemini-2.5-flash)
 as of this writing) - avoids the project needing a manual bump every
 time Google ships a new version. Override via GEMINI_MODEL in .env if
 you want to pin a specific version instead.
@@ -37,7 +37,7 @@ import time
 import requests
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 GEMINI_EMBEDDING_DIM = int(os.getenv("GEMINI_EMBEDDING_DIM", "768"))
 

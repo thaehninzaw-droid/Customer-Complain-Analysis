@@ -545,10 +545,13 @@ function renderPagination(data) {
   document.getElementById('page-next').disabled = data.page >= totalPages;
 }
 
-// ─── View modal (unchanged from original) ────────────────────────────────────
-function openViewModal(ticketNo) {
-  const c = lastPageData.items.find(i => i.ticket_no === ticketNo);
-  if (!c) return;
+// ─── View modal ──────────────────────────────────────────────────────────────
+// Always re-fetches from the server so the status/category/priority shown in
+// the popup matches what was last saved via the inline dropdowns (previously
+// the modal read from the stale in-memory lastPageData.items cache, which was
+// never updated after a PATCH, causing the popup to show the old status even
+// after the admin had already changed it via the dropdown).
+function _renderViewBody(c) {
   document.getElementById('view-body').innerHTML = `
     <div class="view-grid">
       <div><strong>Ticket #</strong><div>${c.ticket_no}</div></div>
@@ -564,8 +567,34 @@ function openViewModal(ticketNo) {
     </div>
     <div class="view-complaint-block">${escapeHtml(c.complaint)}</div>
   `;
+}
+
+async function openViewModal(ticketNo) {
   document.getElementById('view-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  // Show a loading placeholder while we fetch fresh data
+  document.getElementById('view-body').innerHTML = '<p style="color:var(--ink-faint);padding:1rem 0;">Loading…</p>';
+  try {
+    // Fetch all complaints for the current page and find this ticket,
+    // using the same filters that are active so the lookup is fast.
+    const params = new URLSearchParams({ page: currentPage, page_size: PAGE_SIZE });
+    const data = await adminFetch(`/admin/complaints?${params}`);
+    const c = data.items.find(i => i.ticket_no === ticketNo);
+    if (c) {
+      // Update the local cache too so subsequent calls without a page
+      // refresh are also fresh
+      const idx = lastPageData.items.findIndex(i => i.ticket_no === ticketNo);
+      if (idx !== -1) lastPageData.items[idx] = c;
+      _renderViewBody(c);
+    } else {
+      document.getElementById('view-body').innerHTML = '<p style="color:var(--ink-faint);">Complaint not found.</p>';
+    }
+  } catch (e) {
+    // Fallback to cached data so the modal is never completely empty
+    const cached = lastPageData.items.find(i => i.ticket_no === ticketNo);
+    if (cached) _renderViewBody(cached);
+    else document.getElementById('view-body').innerHTML = '<p style="color:var(--danger);">Could not load complaint details.</p>';
+  }
 }
 function closeViewModal() {
   document.getElementById('view-modal').classList.remove('open');

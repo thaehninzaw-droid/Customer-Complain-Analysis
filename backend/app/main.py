@@ -20,6 +20,9 @@ from .models import (
     AdminChatbotResponse,
     AdminComplaintIn,
     AdminComplaintListOut,
+    AdminCustomerDetailOut,
+    AdminCustomerListOut,
+    AdminCustomerOut,
     AuthResponse,
     ChatbotRequest,
     ComplaintIn,
@@ -481,6 +484,91 @@ def admin_ml_status(admin_id: int = Depends(get_current_admin_id)):
             "metrics": _read_metrics("priority_metrics.json"),
         },
     }
+
+
+# --------------------------------------------------------- admin: customers ----
+
+@app.get("/admin/customers", response_model=AdminCustomerListOut)
+def list_customers_admin(
+    admin_id: int = Depends(get_current_admin_id),
+    search: Optional[str] = Query(default=None, description="Match against username or email (case-insensitive)"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    """Paginated list of customer accounts for the admin portal.
+    Only returns users with role == 'customer' — admin accounts are
+    never exposed here. complaint_count is computed inline from the
+    complaints collection, same in-Python style as the rest of the
+    codebase."""
+    users = [u for u in get_collection("users").find() if u.get("role") == "customer"]
+
+    if search:
+        sl = search.strip().lower()
+        users = [
+            u for u in users
+            if sl in u.get("username", "").lower() or sl in u.get("email", "").lower()
+        ]
+
+    users.sort(key=lambda u: u.get("joined", ""), reverse=True)
+
+    total = len(users)
+    start = (page - 1) * page_size
+    page_users = users[start:start + page_size]
+
+    # Count complaints per user in one pass over the complaints collection.
+    all_complaints = list(get_collection("complaints").find())
+    counts: dict = {}
+    for c in all_complaints:
+        uid = c.get("user_id")
+        if uid:
+            counts[uid] = counts.get(uid, 0) + 1
+
+    items = [
+        AdminCustomerOut(
+            user_id=u["user_id"],
+            username=u["username"],
+            email=u["email"],
+            joined=u.get("joined", ""),
+            role=u.get("role", "customer"),
+            complaint_count=counts.get(u["user_id"], 0),
+        )
+        for u in page_users
+    ]
+
+    return AdminCustomerListOut(items=items, total=total, page=page, page_size=page_size)
+
+
+@app.get("/admin/customers/{user_id}", response_model=AdminCustomerDetailOut)
+def get_customer_admin(user_id: int, admin_id: int = Depends(get_current_admin_id)):
+    """Full customer profile + their complaints. Returns 404 if the
+    user does not exist or is an admin account."""
+    user = get_collection("users").find_one({"user_id": user_id})
+    if not user or user.get("role") != "customer":
+        raise HTTPException(status_code=404, detail=f"Customer {user_id} not found.")
+
+    complaints = list(get_collection("complaints").find({"user_id": user_id}))
+    complaints.sort(key=lambda c: c.get("ticket_no", 0), reverse=True)
+
+    all_complaints = list(get_collection("complaints").find())
+    counts: dict = {}
+    for c in all_complaints:
+        uid = c.get("user_id")
+        if uid:
+            counts[uid] = counts.get(uid, 0) + 1
+
+    customer_out = AdminCustomerOut(
+        user_id=user["user_id"],
+        username=user["username"],
+        email=user["email"],
+        joined=user.get("joined", ""),
+        role=user.get("role", "customer"),
+        complaint_count=counts.get(user["user_id"], 0),
+    )
+
+    return AdminCustomerDetailOut(
+        user=customer_out,
+        complaints=[_to_complaint_out(c) for c in complaints],
+    )
 
 
 # ------------------------------------------------------------- chatbot ----
