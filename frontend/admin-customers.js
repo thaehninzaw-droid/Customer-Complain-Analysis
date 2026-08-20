@@ -134,46 +134,31 @@ function renderModal(data) {
   const pending    = complaints.filter(c => c.status === 'Pending').length;
   const inProg     = complaints.filter(c => c.status === 'In Progress').length;
 
-  // ── Info list — label-left / value-right, full-width rows ────────────
-  // Uses a simple <ul> of horizontal pairs so columns always align and
-  // there's no grid-breakpoint juggling. Each row has a fixed-width label
-  // (set in CSS via .cust-info-label { flex: 0 0 140px }).
-  const infoList = `
-    <ul class="cust-info-list">
-      <li class="cust-info-row">
-        <span class="cust-info-label">User ID</span>
-        <span class="cust-info-value mono">#${u.user_id}</span>
-      </li>
-      <li class="cust-info-row">
-        <span class="cust-info-label">Username</span>
-        <span class="cust-info-value">${escapeHtml(u.username)}</span>
-      </li>
-      <li class="cust-info-row">
-        <span class="cust-info-label">Email</span>
-        <span class="cust-info-value">${escapeHtml(u.email)}</span>
-      </li>
-      <li class="cust-info-row">
-        <span class="cust-info-label">Joined</span>
-        <span class="cust-info-value mono">${fmtDate(u.joined)}</span>
-      </li>
-      <li class="cust-info-row">
-        <span class="cust-info-label">Complaints</span>
-        <span class="cust-info-value">${u.complaint_count}</span>
-      </li>
-      <li class="cust-info-row">
-        <span class="cust-info-label">Open issues</span>
-        <span class="cust-info-value">
-          <span class="cust-open-pills">
-            <span class="status-badge ${pending > 0 ? 'pending' : ''}"
-                  style="${pending === 0 ? 'opacity:.4;' : ''}">${pending} Pending</span>
-            <span class="status-badge ${inProg > 0 ? 'pending' : ''}"
-                  style="${inProg === 0 ? 'opacity:.4;' : ''}">${inProg} In Progress</span>
-          </span>
-        </span>
-      </li>
-    </ul>`;
+  // ── Profile grid — identical pattern to the complaint detail modal ────
+  // Bold label on top, value directly below, 2-col grid.
+  // Open-issues row spans both columns (col 1–2) via a wrapper div.
+  const profileGrid = `
+    <div class="view-grid" style="margin-bottom:20px;">
+      <div><strong>User ID</strong>
+           <div style="font-family:var(--font-mono);">#${u.user_id}</div></div>
+      <div><strong>Username</strong>
+           <div>${escapeHtml(u.username)}</div></div>
+      <div><strong>Email</strong>
+           <div>${escapeHtml(u.email)}</div></div>
+      <div><strong>Joined</strong>
+           <div style="font-family:var(--font-mono);">${fmtDate(u.joined)}</div></div>
+      <div><strong>Total complaints</strong>
+           <div>${u.complaint_count}</div></div>
+      <div><strong>Open issues</strong>
+           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;">
+             <span class="status-badge ${pending > 0 ? 'pending' : ''}"
+                   style="${pending === 0 ? 'opacity:.38;' : ''}">${pending} Pending</span>
+             <span class="status-badge ${inProg > 0 ? 'pending' : ''}"
+                   style="${inProg === 0 ? 'opacity:.38;' : ''}">${inProg} In Progress</span>
+           </div></div>
+    </div>`;
 
-  // ── Complaints mini-table ─────────────────────────────────────────────
+  // ── Complaints section ────────────────────────────────────────────────
   let table = '';
   if (!complaints.length) {
     table = `<div class="cust-modal-empty">No complaints filed by this customer.</div>`;
@@ -204,7 +189,7 @@ function renderModal(data) {
       </div>`;
   }
 
-  document.getElementById('cust-modal-body').innerHTML = infoList + table;
+  document.getElementById('cust-modal-body').innerHTML = profileGrid + table;
 }
 
 function closeModal() {

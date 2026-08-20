@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-/* ── Customers page — scoped additions only, no overrides ─────────────── */
+/* ── Customers page — scoped additions only ───────────────────────── */
 
 /* Complaint count pill in the list table */
 .count-pill {
@@ -31,48 +31,6 @@
   border: 1px solid var(--line);
 }
 
-/* Modal — profile info-list (label + value, full-width rows) */
-.cust-info-list {
-  list-style: none;
-  margin: 0 0 24px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.cust-info-row {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 13px 20px;
-  border-bottom: 1px solid var(--line);
-}
-.cust-info-row:last-child { border-bottom: none; }
-.cust-info-row:hover { background: var(--surface-raised); }
-.cust-info-label {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--ink-faint);
-  flex: 0 0 140px;
-}
-.cust-info-value {
-  font-size: 0.92rem;
-  color: var(--ink);
-  font-weight: 500;
-  flex: 1;
-}
-.cust-info-value.mono { font-family: var(--font-mono); font-weight: 400; }
-
-/* Open issues pill strip */
-.cust-open-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
 /* Complaints section heading inside modal */
 .cust-section-label {
   font-family: var(--font-mono);
@@ -83,7 +41,7 @@
   margin: 0 0 10px;
 }
 
-/* Tighter cells for the modal's mini-table */
+/* Tighter row padding for the modal's mini-table */
 .cust-complaints-table td { padding: 10px 12px; vertical-align: middle; }
 .cust-complaints-table .ticket-no { font-size: 0.82rem; }
 
@@ -95,8 +53,7 @@
 }
 
 @media (max-width: 560px) {
-  .cust-info-label { flex: 0 0 100px; }
-  .summary-cards   { grid-template-columns: 1fr 1fr; }
+  .summary-cards { grid-template-columns: 1fr 1fr; }
 }
 </style>
 </head>
