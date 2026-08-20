@@ -8,121 +8,96 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <style>
-  /* ── Customer page local styles ───────────────────────────────── */
+/* ── Customers page — scoped additions only, no overrides ─────────────── */
 
-  /* Stat bar above the table card */
-  .cust-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-  }
+/* Complaint count pill in the list table */
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 100px;
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  background: var(--teal-tint);
+  color: var(--teal-dark);
+}
+.count-pill.zero {
+  background: var(--surface-raised);
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+}
 
-  /* Count badge in the table — neutral pill */
-  .count-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 12px;
-    font-size: 0.78rem;
-    font-family: var(--font-mono);
-    font-weight: 600;
-    background: var(--teal-tint);
-    color: var(--teal-dark);
-    letter-spacing: 0;
-  }
-  .count-badge.zero {
-    background: var(--bg-alt);
-    color: var(--ink-faint);
-  }
+/* Modal — profile info-list (label + value, full-width rows) */
+.cust-info-list {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.cust-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.cust-info-row:last-child { border-bottom: none; }
+.cust-info-row:hover { background: var(--surface-raised); }
+.cust-info-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-faint);
+  flex: 0 0 140px;
+}
+.cust-info-value {
+  font-size: 0.92rem;
+  color: var(--ink);
+  font-weight: 500;
+  flex: 1;
+}
+.cust-info-value.mono { font-family: var(--font-mono); font-weight: 400; }
 
-  /* Customer row — pointer affordance */
-  #cust-tbody tr {
-    cursor: default;
-  }
+/* Open issues pill strip */
+.cust-open-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 
-  /* Modal profile grid — 2-col label/value pairs */
-  .cust-profile-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 28px;
-  }
-  .cust-profile-cell {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--line);
-  }
-  .cust-profile-cell:nth-last-child(-n+2) {
-    border-bottom: none;
-  }
-  .cust-profile-cell:nth-child(odd) {
-    border-right: 1px solid var(--line);
-  }
-  .cust-profile-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--ink-faint);
-    margin-bottom: 4px;
-  }
-  .cust-profile-value {
-    font-size: 0.92rem;
-    color: var(--ink);
-    font-weight: 500;
-  }
-  .cust-profile-value.mono {
-    font-family: var(--font-mono);
-    font-weight: 400;
-  }
+/* Complaints section heading inside modal */
+.cust-section-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
 
-  /* Open issues pill strip in the modal */
-  .cust-open-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 2px;
-  }
+/* Tighter cells for the modal's mini-table */
+.cust-complaints-table td { padding: 10px 12px; vertical-align: middle; }
+.cust-complaints-table .ticket-no { font-size: 0.82rem; }
 
-  /* Modal section heading */
-  .cust-section-head {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--ink-faint);
-    margin: 0 0 12px;
-  }
+.cust-modal-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+}
 
-  /* Tighter complaint rows inside modal */
-  .cust-modal-table td {
-    padding: 10px 12px;
-  }
-  .cust-modal-table .ticket-no {
-    font-size: 0.85rem;
-  }
-
-  /* Empty state inside modal */
-  .cust-modal-empty {
-    text-align: center;
-    padding: 36px 0;
-    color: var(--ink-faint);
-    font-size: 0.9rem;
-  }
-
-  @media (max-width: 600px) {
-    .cust-stats { grid-template-columns: 1fr 1fr; }
-    .cust-profile-grid { grid-template-columns: 1fr; }
-    .cust-profile-cell:nth-child(odd) { border-right: none; }
-    .cust-profile-cell:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
-    .cust-profile-cell:last-child { border-bottom: none; }
-  }
+@media (max-width: 560px) {
+  .cust-info-label { flex: 0 0 100px; }
+  .summary-cards   { grid-template-columns: 1fr 1fr; }
+}
 </style>
 </head>
 <body>
@@ -138,7 +113,7 @@
     </a>
     <div class="nav-links">
       <a href="admin-dashboard.html">Dashboard</a>
-      <a href="admin-customers.html" style="color:var(--teal-dark); font-weight:600;">Customers</a>
+      <a href="admin-customers.html" style="color:var(--teal-dark);font-weight:600;">Customers</a>
       <a href="admin-chatbot.html">AI Chatbot</a>
     </div>
     <div class="nav-auth">
@@ -156,13 +131,13 @@
     <div class="activities-header">
       <span class="eyebrow">Admin portal</span>
       <h1>Customer Accounts</h1>
-      <p style="margin-bottom:0; color:var(--ink-faint);">
+      <p style="color:var(--ink-faint);margin-bottom:0;">
         Registered customers, their contact details, and linked complaint history.
       </p>
     </div>
 
-    <!-- Summary stat cards -->
-    <div class="cust-stats">
+    <!-- Stat cards — same classes as dashboard -->
+    <div class="summary-cards" style="margin-bottom:24px;">
       <div class="summary-card total">
         <span class="summary-label">Total Customers</span>
         <span class="summary-value" id="stat-total">–</span>
@@ -172,23 +147,22 @@
         <span class="summary-value" id="stat-open">–</span>
       </div>
       <div class="summary-card resolved">
-        <span class="summary-label">No Complaints</span>
+        <span class="summary-label">No Complaints Yet</span>
         <span class="summary-value" id="stat-none">–</span>
       </div>
     </div>
 
-    <!-- Table card -->
+    <!-- Table card — identical scaffold to dashboard -->
     <section class="card table-card">
       <div class="table-head">
         <div>
           <h3>All Customers</h3>
-          <p style="margin:4px 0 0; font-size:0.88rem; color:var(--ink-faint);">
-            Search by username or email. Click <strong>View</strong> for full profile and complaints.
+          <p style="margin:4px 0 0;font-size:0.88rem;color:var(--ink-faint);">
+            Search by username or email. Click <strong>View</strong> to see full profile and complaints.
           </p>
         </div>
       </div>
 
-      <!-- Filter bar — same pattern as dashboard -->
       <div class="filter-bar">
         <div class="search-wrap">
           <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -214,13 +188,13 @@
           </thead>
           <tbody id="cust-tbody"></tbody>
         </table>
-        <div id="cust-empty" class="table-empty" style="display:none;">No customers found.</div>
+        <div id="cust-empty"  class="table-empty" style="display:none;">No customers found.</div>
         <div id="cust-loading" class="table-empty">Loading…</div>
       </div>
 
       <div class="pagination" id="cust-pagination" style="display:none;">
         <button id="cust-prev">← Prev</button>
-        <span id="cust-page-info">Page 1</span>
+        <span   id="cust-page-info">Page 1</span>
         <button id="cust-next">Next →</button>
       </div>
     </section>
@@ -230,16 +204,17 @@
 
 <!-- Customer detail modal -->
 <div class="modal-overlay" id="cust-modal">
-  <div class="modal" style="max-width:680px;">
+  <div class="modal" style="max-width:660px;">
     <div class="modal-head">
       <h2 id="cust-modal-title">Customer Profile</h2>
       <button class="modal-close" id="cust-modal-close" aria-label="Close">
-        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px; height:16px;">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;">
           <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
     </div>
-    <div class="modal-body" id="cust-modal-body" style="max-height:74vh; overflow-y:auto; padding-top:4px;"></div>
+    <div class="modal-body" id="cust-modal-body"
+         style="padding-top:20px;max-height:72vh;overflow-y:auto;"></div>
     <div class="modal-foot">
       <button type="button" class="btn btn-ghost" id="cust-modal-close-btn">Close</button>
     </div>

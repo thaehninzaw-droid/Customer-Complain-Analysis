@@ -858,7 +858,7 @@ footer {
   padding: 14px;
   border-bottom: 1px solid var(--line);
   color: var(--ink);
-  vertical-align: top;
+  vertical-align: middle;
   max-width: 260px;
 }
 .complaint-table tbody tr:last-child td {
