@@ -24,40 +24,76 @@ DB_NAME = os.getenv("MONGODB_DB_NAME", "complaints_db")
 class _InMemoryCollection:
     """Minimal stand-in for a pymongo collection. Only used when
     MONGODB_URI isn't set yet. Not for production use - data is lost
-    when the process restarts."""
+    when the process restarts.
+
+    Supported query operators: equality, $in, $nin.
+    Supported projection: {field: 1} include-only (excludes all others).
+    """
 
     def __init__(self):
         self._docs = []
         self._ids = count(1)
 
+    # ── write ──────────────────────────────────────────────────────────
     def insert_one(self, doc):
         doc = dict(doc)
         doc["_id"] = next(self._ids)
         self._docs.append(doc)
         return doc
 
-    def find(self, query=None):
-        if not query:
-            return list(self._docs)
-        return [d for d in self._docs if all(d.get(k) == v for k, v in query.items())]
-
-    def find_one(self, query=None):
-        results = self.find(query)
-        return results[0] if results else None
-
     def update_one(self, query, update):
         """Only supports the {"$set": {...}} shape - that's all this
-        app ever sends. Mirrors pymongo's signature so main.py's code
-        works unchanged against either backend; unlike pymongo, this
-        returns the updated doc directly rather than an UpdateResult -
-        callers here always re-fetch with find_one anyway, so nothing
-        currently depends on the return value's shape."""
+        app ever sends."""
         match = self.find_one(query)
         if match is None:
             return None
         if "$set" in update:
             match.update(update["$set"])
         return match
+
+    # ── read ───────────────────────────────────────────────────────────
+    @staticmethod
+    def _matches(doc: dict, query: dict) -> bool:
+        """Return True if doc satisfies every clause in query.
+        Supports: equality, {$in: [...]}, {$nin: [...]}."""
+        for key, condition in query.items():
+            val = doc.get(key)
+            if isinstance(condition, dict):
+                if "$in" in condition and val not in condition["$in"]:
+                    return False
+                if "$nin" in condition and val in condition["$nin"]:
+                    return False
+            else:
+                if val != condition:
+                    return False
+        return True
+
+    @staticmethod
+    def _project(doc: dict, projection: dict | None) -> dict:
+        """Apply an include-only projection {field: 1, ...}.
+        _id is always included unless explicitly set to 0."""
+        if not projection:
+            return doc
+        include = {k for k, v in projection.items() if v}
+        include.add("_id")
+        return {k: v for k, v in doc.items() if k in include}
+
+    def find(self, query=None, projection=None):
+        if not query:
+            return [self._project(d, projection) for d in self._docs]
+        return [
+            self._project(d, projection)
+            for d in self._docs
+            if self._matches(d, query)
+        ]
+
+    def find_one(self, query=None):
+        if not query:
+            return self._docs[0] if self._docs else None
+        for d in self._docs:
+            if self._matches(d, query):
+                return d
+        return None
 
 
 _fallback_collections = {}

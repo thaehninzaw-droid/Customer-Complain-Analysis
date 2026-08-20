@@ -1397,6 +1397,67 @@ count, no memory leak on re-render.
 
 ---
 
+## Decision 32: In-memory store operator support + table alignment + modal layout overhaul
+
+**Problems identified from live usage screenshots:**
+
+**Backend — `$in` operator not implemented in `_InMemoryCollection`**
+`GET /admin/customers` uses `.find({"user_id": {"$in": page_ids}}, {"user_id": 1})`.
+The original `_InMemoryCollection.find()` matched query clauses with
+`d.get(k) == v` — a dict like `{"$in": [...]}` is never equal to an
+integer, so every complaint was silently excluded from the count. The
+count was always 0 for every customer in in-memory mode. Additionally,
+projection (`{"user_id": 1}`) was ignored entirely, so the full
+complaint document was returned instead of just the `user_id` field.
+
+**Fix:** Rewrote `_InMemoryCollection` with:
+- `_matches(doc, query)` — handles equality, `$in`, and `$nin`
+  operators per key, making the in-memory store compatible with the
+  same query shapes used for real MongoDB.
+- `_project(doc, projection)` — applies include-only projections
+  (`{field: 1}`), so the count query only returns `user_id` per doc,
+  matching the MongoDB behaviour.
+- `find_one` now short-circuits on first match instead of calling
+  `find()` and taking `[0]`, avoiding materialising the full result.
+
+Both `_InMemoryCollection` and real MongoDB now behave identically for
+these query shapes. No changes to call sites in `main.py`.
+
+**Frontend — table row misalignment (Image 2 circle)**
+`complaint-table tbody td` had `vertical-align: top`. When a complaint
+cell wraps to two lines, the inline-select cells (category, priority,
+status) are shorter and sit at the top of the row, creating a visible
+step between their bottom edge and the divider line of the row below.
+Changed to `vertical-align: middle` — all cells in a row now sit
+centred on the row's height regardless of which cell is tallest.
+
+**Frontend — customer modal layout**
+The two-column profile grid (`cust-profile-grid`) broke at narrow
+viewport widths and its bordered-cell approach produced uneven spacing
+when field values were different lengths. Replaced with a
+label-left / value-right list pattern (`cust-info-list` / `cust-info-row`):
+- Label column is `flex: 0 0 140px` — fixed width regardless of
+  content, so all values start at the same x position (like a
+  settings panel).
+- Each row is a full-width flex container with a `1px` bottom border,
+  which renders consistently at any viewport width.
+- No grid breakpoint needed — the layout collapses naturally because
+  both columns are inline-flex items that wrap only when the label
+  width is reduced via the `@media (max-width: 560px)` rule.
+- Open-issues pills use `opacity: 0.4` when count is zero rather than
+  a separate visual state, preserving information while reducing noise.
+
+**Files changed:**
+
+| File | Change |
+|---|---|
+| `backend/app/db.py` | `_InMemoryCollection`: `$in`/`$nin` support, projection support, `find_one` short-circuit |
+| `frontend/style.css` | `complaint-table tbody td`: `vertical-align: top` → `vertical-align: middle` |
+| `frontend/admin-customers.html` | Switched to `cust-info-list` modal layout; removed scoped grid CSS |
+| `frontend/admin-customers.js` | `renderModal` uses `cust-info-list`/`cust-info-row`; `DocumentFragment` batch DOM insert; `tbody.onclick` delegation |
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
