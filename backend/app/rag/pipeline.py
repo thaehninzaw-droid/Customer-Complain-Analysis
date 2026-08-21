@@ -1,22 +1,22 @@
 """
 RAG pipeline: Hybrid retrieval (BM25 + optional Gemini embeddings) →
-Gemini generateContent → answer.
+LLM generateContent → answer.
 
-Retrieval is handled by app/rag/hybrid_retriever.py (HybridRetriever).
-  - BM25: always available, pure Python, no API calls.
-  - Gemini embeddings: optional, query-only (never indexes the corpus),
-    fused with BM25 via Reciprocal Rank Fusion (RRF).
-  - Graceful degradation: if Gemini embeddings are unavailable for any
-    reason (missing key, timeout, rate limit), BM25-only results are
-    used silently.
+Generation backend (in priority order):
+  1. Groq (GROQ_API_KEY set) — fast, geo-accessible, generous free tier.
+  2. Gemini (GEMINI_API_KEY set, no GROQ_API_KEY) — fallback for envs
+     where Groq is unavailable but Gemini is reachable.
+  3. Neither configured → raises an error that chatbot.py catches and
+     converts to a graceful template fallback.
 
-Gemini generateContent is still required for the final answer.
-Raises gemini_client.GeminiError on generation failures — callers
-(app/chatbot.py) catch this and fall back to the template response.
+Retrieval is always BM25 (pure Python, zero API keys needed), with
+optional Gemini query embeddings fused via RRF when available.
+The generation backend choice does NOT affect retrieval.
 
-See docs/DECISIONS.md Decision 30 and docs/RAG_CHATBOT.md.
+See docs/DECISIONS.md Decision 33 for the Groq migration rationale.
 """
 from . import gemini_client
+from . import groq_client
 from .bm25_store import is_indexed
 from .hybrid_retriever import get_retriever
 
@@ -31,37 +31,53 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+def _is_configured() -> bool:
+    """True when at least one generation backend is available."""
+    return groq_client.is_configured() or gemini_client.is_configured()
+
+
+def _generate(prompt: str) -> str:
+    """Call whichever LLM backend is configured, Groq first.
+    Raises GroqError / GeminiError on failure — callers catch both."""
+    if groq_client.is_configured():
+        return groq_client.generate_text(prompt, system_instruction=SYSTEM_INSTRUCTION)
+    if gemini_client.is_configured():
+        return gemini_client.generate_text(prompt, system_instruction=SYSTEM_INSTRUCTION)
+    raise groq_client.GroqError(
+        "No LLM configured. Set GROQ_API_KEY (recommended) or GEMINI_API_KEY in .env."
+    )
+
+
 def answer(question: str, extra_context: str = None, top_k: int = 5) -> dict:
     """Returns {"answer": str, "sources": [str, ...], "used_rag": bool,
                 "used_bm25": bool, "used_embeddings": bool}.
-    Raises GeminiError if Gemini isn't configured or the generation call fails.
 
-    The API surface is backward-compatible: callers that only read
-    "answer", "sources", and "used_rag" continue to work unchanged.
-    The two new boolean fields are informational extras for the UI.
+    Raises GroqError/GeminiError if no LLM is configured or the call fails.
+    API surface is backward-compatible: callers reading only "answer",
+    "sources", and "used_rag" work unchanged.
     """
-    if not gemini_client.is_configured():
-        raise gemini_client.GeminiError("GEMINI_API_KEY not configured.")
+    if not _is_configured():
+        raise groq_client.GroqError(
+            "No LLM configured. Set GROQ_API_KEY (recommended) or GEMINI_API_KEY in .env."
+        )
 
-    # ── Hybrid retrieval (BM25 always; embeddings if available) ──────────
+    # ── Hybrid retrieval (BM25 always; Gemini embeddings if available) ───
     if not is_indexed():
-        context_block = (
+        context_block   = (
             "No knowledge base indexed yet. "
             "Run `python -m app.rag.knowledge_base` from the backend/ folder."
         )
-        sources = []
-        used_rag = False
-        used_bm25 = False
+        sources         = []
+        used_rag        = False
+        used_bm25       = False
         used_embeddings = False
     else:
         retriever = get_retriever()
-
-        # Run both arms so we can report which ones contributed.
         bm25_hits = retriever.search_bm25(question, top_k=top_k)
-        emb_hits = retriever.search_embeddings(question, top_k=top_k)
-        hits = retriever.fuse_results(bm25_hits, emb_hits)[:top_k]
+        emb_hits  = retriever.search_embeddings(question, top_k=top_k)
+        hits      = retriever.fuse_results(bm25_hits, emb_hits)[:top_k]
 
-        used_bm25 = bool(bm25_hits)
+        used_bm25       = bool(bm25_hits)
         used_embeddings = bool(emb_hits)
 
         if hits:
@@ -70,28 +86,28 @@ def answer(question: str, extra_context: str = None, top_k: int = 5) -> dict:
                 f"{h['payload'].get('text', '')}"
                 for h in hits
             )
-            sources = sorted({h["payload"].get("source", "unknown") for h in hits})
+            sources  = sorted({h["payload"].get("source", "unknown") for h in hits})
             used_rag = True
         else:
             context_block = (
                 "No relevant SOP entries found for this query. "
                 "Answer based on general telecom support best practices."
             )
-            sources = []
+            sources  = []
             used_rag = False
 
-    # ── Gemini generateContent ────────────────────────────────────────────
+    # ── LLM generation ────────────────────────────────────────────────────
     prompt_parts = [f"SOP CONTEXT:\n{context_block}"]
     if extra_context:
         prompt_parts.append(f"COMPLAINT CONTEXT:\n{extra_context}")
     prompt_parts.append(f"ADMIN QUESTION:\n{question}")
     prompt = "\n\n".join(prompt_parts)
 
-    text = gemini_client.generate_text(prompt, system_instruction=SYSTEM_INSTRUCTION)
+    text = _generate(prompt)
     return {
-        "answer": text,
-        "sources": sources,
-        "used_rag": used_rag,
-        "used_bm25": used_bm25,
+        "answer":          text,
+        "sources":         sources,
+        "used_rag":        used_rag,
+        "used_bm25":       used_bm25,
         "used_embeddings": used_embeddings,
     }

@@ -27,6 +27,7 @@ See docs/DECISIONS.md Decision 30 and docs/RAG_CHATBOT.md.
 """
 from .categories import CATEGORIES
 from .rag import gemini_client
+from .rag import groq_client
 from .rag.pipeline import answer as rag_answer
 
 RECOMMENDATIONS = {
@@ -61,8 +62,9 @@ def get_recommendation(complaint_text: str, category: str) -> str:
 
 def ask_admin_chatbot(question: str, ticket_context: str = None) -> dict:
     """Powers POST /admin/chatbot/ask. Returns
-    {"answer": str, "sources": [str,...], "used_rag": bool}."""
-    if gemini_client.is_configured():
+    {"answer": str, "sources": [str,...], "used_rag": bool}.
+    Uses Groq for generation if GROQ_API_KEY is set, Gemini otherwise."""
+    if groq_client.is_configured() or gemini_client.is_configured():
         try:
             result = rag_answer(question, extra_context=ticket_context, top_k=4)
             return {"answer": result["answer"], "sources": result["sources"], "used_rag": True}
@@ -70,7 +72,7 @@ def ask_admin_chatbot(question: str, ticket_context: str = None) -> dict:
             return {
                 "answer": (
                     f"The AI chatbot hit an error generating a response ({e}). "
-                    "Keyword search (BM25) is still available — try rephrasing "
+                    "BM25 keyword search is still available — try rephrasing "
                     "your question, or check docs/RAG_CHATBOT.md for "
                     "setup/troubleshooting."
                 ),
@@ -79,11 +81,10 @@ def ask_admin_chatbot(question: str, ticket_context: str = None) -> dict:
             }
     return {
         "answer": (
-            "The AI chatbot isn't configured yet — set GEMINI_API_KEY "
-            "in your .env, then run "
+            "The AI chatbot isn't configured yet — set GROQ_API_KEY "
+            "(recommended) or GEMINI_API_KEY in your .env, then run "
             "`python -m app.rag.knowledge_base` to index the SOP docs. "
-            "The system will use BM25 keyword search for retrieval "
-            "(no additional API keys needed). "
+            "BM25 keyword search handles retrieval — no extra keys needed. "
             "See docs/RAG_CHATBOT.md."
         ),
         "sources": [],
