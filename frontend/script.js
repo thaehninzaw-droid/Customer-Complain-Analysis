@@ -348,41 +348,28 @@ function containsProfanity(text) {
 const BANNED_SINGLE_WORDS = new Set(['hii','heyy','asdfgh','qwerty','zxcvbn','12345','123456','abc','asdf','qwer','poiu','lkjh','mnbv']);
 
 function isMeaningfulComplaint(text) {
-  if (!text) return false;
+  // Always return {ok, reason} — never a bare false.
+  // Callers do .ok on the result; a bare false throws a TypeError.
+  if (!text || !text.trim()) {
+    return { ok: false, reason: 'Please enter a description of your complaint.' };
+  }
   const t = text.trim();
-  if (t.length < 20) return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-  if (t.length > 1000) return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-
+  if (t.length < 20) {
+    return { ok: false, reason: `Please add more detail (${t.length}/20 characters minimum).` };
+  }
+  if (t.length > 1000) {
+    return { ok: false, reason: `Description too long (${t.length}/1000 characters maximum).` };
+  }
   if (containsProfanity(t)) {
     return { ok: false, reason: 'Please avoid offensive or inappropriate language.' };
   }
 
-  const onlyLetters = t.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 0);
-  let realWords = [];
-  for (const w of onlyLetters) {
-    if (w.length >= 2 && !/^([a-z])\1+$/.test(w) && !BANNED_SINGLE_WORDS.has(w)) {
-      realWords.push(w);
-    }
-  }
-  if (realWords.length < 3) {
-    return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-  }
-
-  const tLower = t.toLowerCase();
-  if (/^([a-z])\1*$/.test(tLower.replace(/[^a-z]/g,''))) {
-    return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-  }
-  if (/^([0-9])\1*$/.test(tLower.replace(/[^0-9]/g,'')) && t.replace(/[^0-9]/g,'').length > 5) {
-    return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-  }
-  if (/^([^a-z0-9])\1*$/.test(tLower.replace(/[a-z0-9]/g,'')) && t.replace(/[a-z0-9]/g,'').length > 4) {
-    return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-  }
-
-  for (const bw of BANNED_SINGLE_WORDS) {
-    if (tLower.split(/[^a-z0-9]+/).filter(Boolean).every(w => w === bw)) {
-      return { ok: false, reason: 'Please enter a meaningful description of your complaint.' };
-    }
+  // Word count: split on whitespace (not [^a-z]) so capital letters,
+  // numbers, and non-ASCII characters are counted as part of words,
+  // not as word boundaries. "Unfair Billing Practices" = 3 words. ✓
+  const words = t.trim().split(/\s+/).filter(w => w.length >= 2);
+  if (words.length < 3) {
+    return { ok: false, reason: 'Please include at least 3 words describing the issue.' };
   }
 
   return { ok: true };

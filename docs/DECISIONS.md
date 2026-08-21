@@ -1458,6 +1458,78 @@ label-left / value-right list pattern (`cust-info-list` / `cust-info-row`):
 
 ---
 
+## Decision 33: Groq as primary LLM backend; complaint form validation fixes
+
+### Part A — Groq replaces Gemini for generation
+
+**Problem:** `generativelanguage.googleapis.com` is geo-blocked in Myanmar.
+Every chatbot request from the deployment environment results in a
+connection timeout regardless of API key validity. The admin chatbot
+was non-functional for the entire team running the thesis demo.
+
+**Solution:** Added `app/rag/groq_client.py`, a plain `requests`-based
+wrapper around Groq's OpenAI-compatible `/v1/chat/completions` endpoint.
+Groq's `api.groq.com` is accessible from Myanmar and offers a generous
+free tier. Default model: `meta-llama/llama-4-scout-17b-16e-instruct`
+(override via `GROQ_MODEL` in `.env`).
+
+**Priority order in `pipeline.py`:**
+1. Groq (`GROQ_API_KEY` set) — used first.
+2. Gemini (`GEMINI_API_KEY` set, no Groq key) — fallback for envs where
+   Groq is unavailable but Gemini is reachable.
+3. Neither → raises an error that `chatbot.py` converts to a graceful
+   template fallback message (existing behaviour unchanged).
+
+**Embedding is not affected.** Groq does not provide embedding APIs.
+The BM25 arm of `HybridRetriever` runs unconditionally. The Gemini
+embedding arm silently returns `[]` when `GEMINI_API_KEY` is absent —
+this was already the designed fallback path; no code change needed.
+
+**Files changed:**
+
+| File | Change |
+|---|---|
+| `app/rag/groq_client.py` | **New.** `generate_text()`, `is_configured()`, `GroqError` (also exported as `GeminiError` alias for zero-change caller compatibility). |
+| `app/rag/pipeline.py` | `_generate()` helper tries Groq first, Gemini second. `_is_configured()` checks both. |
+| `app/chatbot.py` | Imports `groq_client`; `ask_admin_chatbot` checks `groq_client.is_configured() or gemini_client.is_configured()`; updated fallback message. |
+| `backend/.env.example` | `GROQ_API_KEY` and `GROQ_MODEL` added as primary; Gemini kept as documented fallback; geo-block note added. |
+| `frontend/admin-chatbot.html` | Stale "via Gemini + Qdrant" description updated to "BM25 keyword retrieval and LLM generation". |
+
+---
+
+### Part B — Complaint form validation fixes
+
+**Bug 1 — `isMeaningfulComplaint` returns bare `false`, causing silent crash.**
+`if (!text) return false` — all callers do `.ok` on the return value.
+`false.ok` throws `TypeError: Cannot read properties of undefined`.
+This silently prevented form submission whenever the textarea was
+empty at the point of the check. Fixed: always return `{ok, reason}`.
+
+**Bug 2 — Capital letters counted as word-boundary characters.**
+`t.toLowerCase().split(/[^a-z]+/)` was intended to extract words after
+lowercasing, but the split regex `[^a-z]` also matches digits, spaces,
+and any character that isn't a lowercase letter — including the original
+capital letters *after* lowercasing (they're already lowercase at that
+point, so this was actually fine). The real problem: the split pattern
+discards any word containing a non-letter character (e.g. "Wi-Fi",
+"100Mbps", or any word with a hyphen or number). A complaint like
+"Wi-Fi disconnects every night" would split into fragments that fail
+the 2-character minimum. Fixed: split on whitespace (`/\s+/`) instead,
+which correctly counts all space-separated tokens as words.
+
+**Bug 3 — Error message for length didn't show actual count.**
+Generic "Please enter a meaningful description" didn't tell the user
+how long their text was. Updated to show `(N/20 characters minimum)`
+and `(N/1000 characters maximum)` so the user knows exactly what to fix.
+
+**Files changed:**
+
+| File | Change |
+|---|---|
+| `frontend/script.js` | `isMeaningfulComplaint`: always return object; whitespace word split; informative length messages |
+
+---
+
 ## Not done yet (known gaps, not oversights)
 
 Being upfront about these matters as much as the decisions above:
