@@ -761,27 +761,16 @@ function convertTimeToDb(hour12, minute, second, ampm) {
   return `${pad2(h)}:${pad2(parseInt(minute, 10))}:${pad2(parseInt(second, 10))}`;
 }
 function validateDateTimeYangon(iso, h12, mm, ss, ampm) {
+  // Complaints describe events that already happened — past dates and
+  // past times today are intentionally allowed. Only future dates are
+  // rejected. The backend stamps the real submission timestamp server-side.
   if (!iso) return { ok: false, dateErr: 'Please pick a date.', timeErr: '' };
   const nowParts = getYangonDateParts(new Date());
   const [yPicked, mPicked, dPicked] = iso.split('-').map(n => parseInt(n, 10));
-  const picked = { y: yPicked, m: mPicked - 1, d: dPicked };
-  if (yPicked < nowParts.y ||
-      (yPicked === nowParts.y && (mPicked - 1) < nowParts.m) ||
-      (yPicked === nowParts.y && (mPicked - 1) === nowParts.m && dPicked < nowParts.d)) {
-    return { ok: false, dateErr: 'Date cannot be in the past.', timeErr: '' };
-  }
-  let hh24 = parseInt(h12, 10);
-  if (ampm === 'AM' && hh24 === 12) hh24 = 0;
-  if (ampm === 'PM' && hh24 !== 12) hh24 += 12;
-  const mi = parseInt(mm, 10);
-  const se = parseInt(ss, 10);
-  const isSameDay = (yPicked === nowParts.y && (mPicked - 1) === nowParts.m && dPicked === nowParts.d);
-  if (isSameDay) {
-    if (hh24 < nowParts.hh ||
-        (hh24 === nowParts.hh && mi < nowParts.mm) ||
-        (hh24 === nowParts.hh && mi === nowParts.mm && se < nowParts.ss)) {
-      return { ok: false, dateErr: '', timeErr: 'Time cannot be in the past. Pick a later time today.' };
-    }
+  if (yPicked > nowParts.y ||
+      (yPicked === nowParts.y && (mPicked - 1) > nowParts.m) ||
+      (yPicked === nowParts.y && (mPicked - 1) === nowParts.m && dPicked > nowParts.d)) {
+    return { ok: false, dateErr: 'Date cannot be in the future.', timeErr: '' };
   }
   return { ok: true };
 }
@@ -792,6 +781,9 @@ function openComplaintModal() {
   buildTimeSelectOptions();
 
   ['err-complaint','err-date','err-time','err-city'].forEach(clearFieldError);
+  // Also explicitly reset aria-invalid on all inputs so the red border
+  // from a previous failed submit doesn't bleed into the next modal open.
+  ['f-complaint','f-date','f-hour','f-minute','f-ampm','city-search'].forEach(id => setFieldValid(id, true));
 
   const ticketInput = document.getElementById('f-ticket');
   if (ticketInput) ticketInput.value = 'Assigned automatically on submit';
@@ -815,7 +807,7 @@ function openComplaintModal() {
   const dateInput = document.getElementById('f-date');
   if (dateInput) {
     dateInput.value = formatYangonDate(yg);
-    dateInput.min = formatYangonDate(yg);
+    dateInput.max = formatYangonDate(yg); // future dates not allowed
   }
 
   const hourSel = document.getElementById('f-hour');
@@ -958,10 +950,21 @@ function wireActivitiesPage() {
 
   const complaintInput = document.getElementById('f-complaint');
   if (complaintInput) {
+    // On input: only clear the error once the text becomes valid.
+    // Never show the error mid-sentence — that fires on every keystroke
+    // and marks the field red before the user has finished typing.
     complaintInput.addEventListener('input', () => {
-      const res = isMeaningfulComplaint(complaintInput.value);
-      if (complaintInput.value.trim().length === 0) clearFieldError('err-complaint');
-      else if (res.ok) clearFieldError('err-complaint');
+      const v = complaintInput.value;
+      if (v.trim().length === 0) { clearFieldError('err-complaint'); return; }
+      if (isMeaningfulComplaint(v).ok) clearFieldError('err-complaint');
+      // Don't call showFieldError here — wait for blur.
+    });
+    // On blur: now it's safe to show the error if still invalid.
+    complaintInput.addEventListener('blur', () => {
+      const v = complaintInput.value;
+      if (v.trim().length === 0) { clearFieldError('err-complaint'); return; }
+      const res = isMeaningfulComplaint(v);
+      if (res.ok) clearFieldError('err-complaint');
       else showFieldError('err-complaint', res.reason);
     });
   }
