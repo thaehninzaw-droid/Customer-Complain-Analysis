@@ -195,6 +195,23 @@ def create_complaint(complaint: ComplaintIn, user_id: int = Depends(get_current_
     category = complaint.category or classify_complaint(complaint.complaint)
     priority = complaint.priority or predict_priority(complaint.complaint, category)
     now = datetime.now(YANGON_TZ)
+
+    # Use the user-supplied incident date/time if provided and not in the future.
+    # Fall back to server now() on any missing value or parse error.
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H:%M:%S")
+    if complaint.incident_date:
+        try:
+            incident_dt = datetime.strptime(
+                f"{complaint.incident_date} {complaint.incident_time or '00:00:00'}",
+                "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=YANGON_TZ)
+            if incident_dt <= now:
+                date_str = incident_dt.strftime("%Y-%m-%d")
+                time_str = incident_dt.strftime("%H:%M:%S")
+        except ValueError:
+            pass  # malformed input — fall back to server now()
+
     collection = get_collection("complaints")
     existing = list(collection.find())
 
@@ -204,8 +221,8 @@ def create_complaint(complaint: ComplaintIn, user_id: int = Depends(get_current_
         "category": category,
         "priority": priority,
         "complaint": complaint.complaint,
-        "date_month_year": now.strftime("%Y-%m-%d"),
-        "time": now.strftime("%H:%M:%S"),
+        "date_month_year": date_str,
+        "time": time_str,
         "city": complaint.city,
         "state": complaint.state,
         "zipcode": complaint.zipcode,

@@ -1013,12 +1013,12 @@ function wireActivitiesPage() {
 
       if (!valid) return;
 
-      // Note: date/time picked in the form aren't sent - the backend
-      // stamps the complaint with the real server-side submission time
-      // (see POST /complaints in app/main.py). The picker above is kept
-      // for the meaningful "when did this happen" UX check, matching the
-      // original design, but a filed complaint's official timestamp is
-      // always "now," server-side.
+      // Convert 12-hour picker values → 24-hour for the backend.
+      let hh24 = parseInt(hour12, 10);
+      if (ampm === 'AM' && hh24 === 12) hh24 = 0;
+      if (ampm === 'PM' && hh24 !== 12) hh24 += 12;
+      const incident_time = `${String(hh24).padStart(2,'0')}:${minute}:${second}`;
+
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) submitBtn.disabled = true;
 
@@ -1026,7 +1026,11 @@ function wireActivitiesPage() {
         const res = await fetch(`${API_BASE}/complaints`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...llAuthHeaders() },
-          body: JSON.stringify({ complaint, city, state, zipcode, category })
+          body: JSON.stringify({
+            complaint, city, state, zipcode, category,
+            incident_date: date_month_year,
+            incident_time,
+          })
         });
         let data = null;
         try { data = await res.json(); } catch (e2) { /* no body */ }

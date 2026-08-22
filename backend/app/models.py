@@ -60,6 +60,12 @@ class ComplaintIn(BaseModel):
     # - keeps today's manual dropdown behavior working too.
     category: Optional[str] = None
     priority: Optional[str] = None
+    # User-supplied incident date/time (Yangon local, from the form
+    # date picker). Format: incident_date = "YYYY-MM-DD",
+    # incident_time = "HH:MM:SS" (24h). Both optional — if absent the
+    # backend falls back to server now(). Future dates are rejected.
+    incident_date: Optional[str] = None
+    incident_time: Optional[str] = None
 
 
 class ComplaintOut(BaseModel):
