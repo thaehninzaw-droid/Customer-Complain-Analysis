@@ -38,6 +38,14 @@ class _InMemoryCollection:
     def insert_one(self, doc):
         doc = dict(doc)
         doc["_id"] = next(self._ids)
+        # Guard against duplicate insertion on hot-reload: if a doc with
+        # the same user_id or email already exists, skip silently.
+        if "user_id" in doc:
+            if any(d.get("user_id") == doc["user_id"] for d in self._docs):
+                return doc  # already present, don't duplicate
+        if "email" in doc and doc.get("role") == "admin":
+            if any(d.get("email") == doc["email"] for d in self._docs):
+                return doc  # admin already seeded
         self._docs.append(doc)
         return doc
 
@@ -79,11 +87,19 @@ class _InMemoryCollection:
         return {k: v for k, v in doc.items() if k in include}
 
     def find(self, query=None, projection=None):
+        # Deduplicate by _id as a safety net against hot-reload duplication.
+        seen = set()
+        unique_docs = []
+        for d in self._docs:
+            oid = d.get("_id")
+            if oid not in seen:
+                seen.add(oid)
+                unique_docs.append(d)
         if not query:
-            return [self._project(d, projection) for d in self._docs]
+            return [self._project(d, projection) for d in unique_docs]
         return [
             self._project(d, projection)
-            for d in self._docs
+            for d in unique_docs
             if self._matches(d, query)
         ]
 

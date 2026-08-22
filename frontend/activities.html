@@ -124,14 +124,11 @@
   color: var(--ink);
   line-height: 1;
 }
-.act-stat-value.pending { color: var(--amber-dark); }
+.act-stat-value.pending  { color: var(--amber-dark); }
 .act-stat-value.resolved { color: var(--teal-dark); }
 
 /* Main area */
-.act-main {min-width: 0;}
-
-/* Toolbar: search + button */
-.act-toolbar {
+.act-main { min-width: 0; }
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
@@ -139,7 +136,7 @@
 }
 .act-toolbar .search-wrap { flex: 1; }
 
-/* Complaint table card */
+/* Complaint history card */
 .complaints-card {
   background: var(--surface);
   border-radius: var(--radius-md);
@@ -159,12 +156,21 @@
   font-size: 0.72rem;
   color: var(--ink-faint);
 }
+/* Table inside the complaints card — no extra side padding, horizontally scrollable */
+.complaints-card .table-wrap {
+  padding: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.complaints-card .complaint-table {
+  margin-top: 0;
+  min-width: 700px; /* ensures table never crushes below readable width */
+}
 
 @media (max-width: 800px) {
   .act-body { grid-template-columns: 1fr; }
   .act-sidebar { order: 2; }
   .act-main   { order: 1; }
-  .act-stats  { grid-template-columns: repeat(3, 1fr); }
 }
 </style>
 </head>

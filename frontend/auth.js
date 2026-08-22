@@ -234,6 +234,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- On index.html: inject "Activities" into nav-links when logged in ---
+  const onIndexPage = window.location.pathname.endsWith('index.html')
+    || window.location.pathname === '/'
+    || window.location.pathname.endsWith('/frontend/');
+  if (onIndexPage && session && session.user.role !== 'admin') {
+    const navLinks = document.querySelector('.nav-links');
+    if (navLinks && !navLinks.querySelector('a[href="activities.html"]')) {
+      const a = document.createElement('a');
+      a.href = 'activities.html';
+      a.textContent = 'Activities';
+      a.style.fontWeight = '600';
+      a.style.color = 'var(--teal-dark)';
+      navLinks.appendChild(a);
+    }
+  }
+
   // --- Activities profile card: show real user info (email, joined, name) ---
   const profileNameEl = document.getElementById('profile-name') || document.querySelector('.profile-name');
   const profileEmailEl = document.getElementById('profile-email');

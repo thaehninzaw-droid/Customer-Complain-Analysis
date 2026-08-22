@@ -4,14 +4,10 @@ from app.rag.knowledge_base import chunk_text, load_documents
 def test_load_documents_finds_all_sop_files():
     docs = load_documents()
     sources = {d["source"] for d in docs}
-    expected_files = {
-        "Billing Complaints.md",
-        "Service Complaints.md",
-        "Technical Complaints.md",
-        "Other Complaints.md",
-        "Financial Complaints.md",
+    assert sources == {
+        "billing_sop.md", "financial_sop.md", "technical_sop.md",
+        "service_sop.md", "others_sop.md",
     }
-    assert sources == expected_files
 
 
 def test_chunk_text_respects_chunk_size():

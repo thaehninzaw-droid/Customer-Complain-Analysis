@@ -794,7 +794,7 @@ function openComplaintModal() {
   const dateInput = document.getElementById('f-date');
   if (dateInput) {
     dateInput.value = formatYangonDate(yg);
-    dateInput.max = formatYangonDate(yg); // future dates not allowed
+    dateInput.max = formatYangonDate(yg);
   }
 
   const hourSel = document.getElementById('f-hour');

@@ -859,8 +859,18 @@ footer {
   border-bottom: 1px solid var(--line);
   color: var(--ink);
   vertical-align: top;
-  max-width: 260px;
 }
+/* Per-column width constraints so columns don't crowd or spread too wide */
+.complaint-table td:nth-child(1)  { white-space: nowrap; width: 90px; }   /* Ticket # */
+.complaint-table td:nth-child(2)  { width: 100px; }                       /* Category */
+.complaint-table td:nth-child(3)  { max-width: 200px; }                   /* Complaint */
+.complaint-table td:nth-child(4),
+.complaint-table td:nth-child(5)  { white-space: nowrap; width: 100px; }  /* Date, Time */
+.complaint-table td:nth-child(6)  { white-space: nowrap; width: 80px; }   /* City */
+.complaint-table td:nth-child(7)  { white-space: nowrap; width: 110px; }  /* State */
+.complaint-table td:nth-child(8)  { white-space: nowrap; width: 70px; }   /* Zip */
+.complaint-table td:nth-child(9)  { width: 100px; }                       /* Status */
+.complaint-table td:nth-child(10) { width: 70px; }                        /* Actions */
 .complaint-table tbody tr:last-child td {
   border-bottom: none;
 }
