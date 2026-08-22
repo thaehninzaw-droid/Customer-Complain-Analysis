@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Activities profile card: show real user info (email, joined, name) ---
-  const profileNameEl = document.querySelector('.profile-name');
+  const profileNameEl = document.getElementById('profile-name') || document.querySelector('.profile-name');
   const profileEmailEl = document.getElementById('profile-email');
   const profileJoinedEl = document.getElementById('profile-joined');
   if (onActivitiesPage && session) {
@@ -246,14 +246,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Survey gate on index.html ---
-  const surveyGate = document.getElementById('survey-gate');
-  const surveyForm = document.getElementById('survey-form');
-  if (surveyGate && surveyForm) {
+  const surveyGate    = document.getElementById('survey-gate');
+  const surveyForm    = document.getElementById('survey-form');
+  const surveyGuestCta = document.getElementById('survey-guest-cta');
+  if (surveyForm) {
     if (session) {
-      surveyGate.style.display = 'none';
+      if (surveyGate)     surveyGate.style.display     = 'none';
+      if (surveyGuestCta) surveyGuestCta.style.display = 'none';
       surveyForm.style.display = 'block';
     } else {
-      surveyGate.style.display = 'block';
+      if (surveyGate)     surveyGate.style.display     = 'flex';
+      if (surveyGuestCta) surveyGuestCta.style.display = 'block';
       surveyForm.style.display = 'none';
     }
   }
