@@ -5,8 +5,279 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Loopline — Customer Issue Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+/* ── Landing-page-only additions ─────────────────────────────────── */
+
+/* Hero — full-bleed teal with large editorial type */
+.hero-v2 {
+  background: var(--teal-dark);
+  color: #fff;
+  padding: 100px 0 80px;
+  overflow: hidden;
+  position: relative;
+}
+.hero-v2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(63,132,137,.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-v2 .container { position: relative; z-index: 1; }
+
+.hero-v2 .eyebrow {
+  color: rgba(255,255,255,.55);
+  margin-bottom: 1.25rem;
+}
+.hero-v2 h1 {
+  color: #fff;
+  font-size: clamp(2.6rem, 6vw, 4.2rem);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  max-width: 700px;
+  margin-bottom: 1.25rem;
+}
+.hero-v2 h1 em {
+  font-style: italic;
+  color: var(--amber);
+}
+.hero-v2 .hero-sub {
+  color: rgba(255,255,255,.72);
+  font-size: 1.1rem;
+  max-width: 500px;
+  margin-bottom: 2.25rem;
+  line-height: 1.6;
+}
+.hero-v2 .hero-cta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hero-v2 .btn-outline-white {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.35);
+  color: rgba(255,255,255,.85);
+  padding: 12px 22px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: border-color .15s, color .15s;
+}
+.hero-v2 .btn-outline-white:hover {
+  border-color: rgba(255,255,255,.7);
+  color: #fff;
+}
+
+/* Pulse card inside hero */
+.hero-pulse {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  margin-top: 52px;
+  max-width: 480px;
+}
+.hero-pulse-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,.55);
+  font-family: var(--font-mono);
+}
+.hero-pulse-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.hero-pulse-tag {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  padding: 3px 9px;
+  border-radius: 100px;
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.7);
+}
+.hero-pulse-tag.amber { background: rgba(255,201,74,.18); color: var(--amber); }
+
+/* About section — clean, no nested cards */
+.about-section {
+  padding: 96px 0;
+  background: var(--surface);
+}
+.about-lead {
+  max-width: 620px;
+  margin: 0 auto 64px;
+  text-align: center;
+}
+.about-lead h2 {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+.about-lead p { font-size: 1.05rem; line-height: 1.65; }
+
+/* Three-column pillars — no card borders, just space */
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 48px 40px;
+}
+.pillar {}
+.pillar-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--teal-tint);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  color: var(--teal-dark);
+}
+.pillar h3 {
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+.pillar p { font-size: 0.94rem; line-height: 1.65; margin: 0; }
+
+/* Contact section */
+.contact-section {
+  padding: 96px 0;
+  background: var(--bg);
+}
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+.contact-info h2 { margin-bottom: 1rem; }
+.contact-info p { font-size: 1rem; line-height: 1.65; margin-bottom: 2rem; }
+.contact-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.contact-detail strong { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .07em; font-family: var(--font-mono); color: var(--ink-faint); }
+.contact-detail span { font-size: 0.95rem; color: var(--ink); margin-top: 2px; }
+
+/* Survey section */
+.survey-section {
+  padding: 96px 0;
+  background: var(--surface);
+}
+.survey-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+.survey-copy h2 { margin-bottom: 1rem; }
+.survey-copy p { font-size: 1rem; line-height: 1.65; }
+.gate-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--amber-tint);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-top: 8px;
+}
+.gate-banner p { color: var(--amber-dark); margin: 0; font-size: 0.9rem; font-weight: 500; }
+
+/* Survey form — no wrapper card, just clean fields */
+.survey-form-bare { max-width: 100%; }
+
+/* Footer */
+.footer-v2 {
+  background: var(--ink);
+  color: rgba(255,255,255,.5);
+  padding: 40px 0;
+}
+.footer-inner-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(255,255,255,.8);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ── Index page visual upgrades ─────────────────────────────────── */
+
+/* Section spacing — more generous breathing room */
+.about-section  { padding: 112px 0; }
+.contact-section { padding: 112px 0; }
+.survey-section  { padding: 112px 0; }
+
+/* Pillars — stronger number/icon contrast */
+.pillar-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--teal-tint);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  color: var(--teal-dark);
+}
+.pillar h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; }
+.pillar p  { font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); }
+
+/* Contact form — elevated surface */
+.contact-section form {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 36px 32px;
+}
+
+/* About section divider line between pillars on desktop */
+@media (min-width: 769px) {
+  .pillars { gap: 0; }
+  .pillar {
+    padding: 0 40px;
+    border-right: 1px solid var(--line);
+  }
+  .pillar:first-child { padding-left: 0; }
+  .pillar:last-child  { padding-right: 0; border-right: none; }
+}
+
+
+@media (max-width: 768px) {
+  .pillars         { grid-template-columns: 1fr; gap: 36px; }
+  .contact-grid    { grid-template-columns: 1fr; gap: 40px; }
+  .survey-inner    { grid-template-columns: 1fr; gap: 36px; }
+  .hero-v2         { padding: 72px 0 56px; }
+  .pillar          { padding: 0 !important; border-right: none !important; }
+  .about-section   { padding: 72px 0; }
+  .contact-section { padding: 72px 0; }
+  .survey-section  { padding: 72px 0; }
+}
+</style>
 </head>
 <body>
 
@@ -20,105 +291,99 @@
       Loopline
     </a>
     <div class="nav-links">
-      <a href="#about">About Us</a>
-      <a href="#contact">Contact Us</a>
-      <a href="activities.html">Activities</a>
-      <a href="#survey">Survey</a>
-      <a href="#chat">AI Chat</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
     </div>
     <div class="nav-auth">
-      <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+      <a href="login.html"  class="btn btn-ghost btn-sm">Log in</a>
       <a href="signup.html" class="btn btn-primary btn-sm">Sign up</a>
-      <a href="admin-login.html" class="btn btn-ghost btn-sm" style="opacity:0.65;" title="Admin Login">Admin</a>
+      <a href="admin-login.html" class="btn btn-ghost btn-sm" style="opacity:0.55; font-size:0.78rem;" title="Admin">Admin</a>
     </div>
     <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
-<!-- ================= HERO ================= -->
-<header class="hero">
-  <div class="container hero-inner">
-    <div>
-      <span class="eyebrow">Customer issue analysis</span>
-      <h1>Every complaint is a clue. Loopline reads them all at once.</h1>
-      <p class="hero-sub">One place to collect customer issues, hear them out, and see the patterns a single ticket never shows on its own.</p>
-      <div class="hero-cta">
-        <a href="#survey" class="btn btn-amber">Try the survey</a>
-        <a href="#chat" class="btn btn-ghost">Ask the assistant</a>
-      </div>
+<!-- ═══════════════ HERO ═══════════════ -->
+<header class="hero-v2">
+  <div class="container">
+    <span class="eyebrow">Customer issue analysis</span>
+    <h1>Every complaint is a clue.<br><em>Loopline reads them all.</em></h1>
+    <p class="hero-sub">One place to collect customer issues, hear them out, and surface the patterns a single ticket never shows on its own.</p>
+    <div class="hero-cta">
+      <a href="signup.html" class="btn btn-amber" style="font-size:1rem; padding:14px 28px;">Get started free</a>
+      <a href="login.html"  class="btn-outline-white" style="font-size:1rem; padding:14px 28px;">Sign in →</a>
     </div>
-    <div>
-      <div class="illus-wrap">
-        <img src="img/chat-people.svg" alt="Illustration of two people chatting" style="margin-bottom: 18px;">
+
+    <div class="hero-pulse">
+      <div class="hero-pulse-head">
+        <span>Issue pulse — last 7 days</span>
+        <span>Updated hourly</span>
       </div>
-      <div class="pulse-card" aria-hidden="false">
-        <div class="pulse-card-head">
-          <span>Issue pulse — last 7 days</span>
-          <span class="tag">Updated hourly</span>
-        </div>
-        <svg viewBox="0 0 320 120" width="100%" height="120" xmlns="http://www.w3.org/2000/svg" id="pulse-svg">
-          <polyline id="pulse-bg" fill="none" stroke="#D7DEE5" stroke-width="2"/>
-          <polyline id="pulse-line" fill="none" stroke="#3F8489" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <g id="pulse-dots"></g>
-        </svg>
-        <div class="pulse-tags">
-          <span class="tag amber">Spike · Billing</span>
-          <span class="tag">Resolved · Delivery</span>
-          <span class="tag">Resolved · Login</span>
-        </div>
+      <svg viewBox="0 0 320 80" width="100%" height="80" xmlns="http://www.w3.org/2000/svg" id="pulse-svg">
+        <polyline id="pulse-bg"   fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>
+        <polyline id="pulse-line" fill="none" stroke="var(--amber)"          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <g id="pulse-dots"></g>
+      </svg>
+      <div class="hero-pulse-tags">
+        <span class="hero-pulse-tag amber">Spike · Billing</span>
+        <span class="hero-pulse-tag">Resolved · Delivery</span>
+        <span class="hero-pulse-tag">Resolved · Login</span>
       </div>
     </div>
   </div>
 </header>
 
-<!-- ================= ABOUT ================= -->
-<section id="about">
+<!-- ═══════════════ ABOUT ═══════════════ -->
+<section id="about" class="about-section">
   <div class="container">
-    <div class="section-head">
-      <span class="eyebrow">About us</span>
+    <div class="about-lead">
+      <span class="eyebrow" style="color:var(--teal-dark);">About us</span>
       <h2>Turning support noise into signal</h2>
-      <p>Most support teams collect complaints one ticket at a time, but rarely step back to see what the whole pile is saying. Loopline brings every issue into one view — a survey to gather input, an assistant to triage it, and a real team behind it to follow up.</p>
+      <p>Most teams handle complaints one ticket at a time and never see the bigger picture. Loopline brings every issue into one view — structured input, automatic triage, and pattern detection across time.</p>
     </div>
-    <div class="grid-3">
-      <div class="card">
-        <div class="icon-badge">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9H6L7.5 3L10.5 15L12 9H16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 10H7L8.5 4L11.5 16L13 10H17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
         <h3>Collect</h3>
-        <p>Every survey response and chat message feeds the same pool of issues, tagged by category and severity.</p>
+        <p>Every survey response and chat message feeds the same pool of issues, tagged by category and severity automatically.</p>
       </div>
-      <div class="card">
-        <div class="icon-badge">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M9 5.5V9L11.5 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <div class="pillar">
+        <div class="pillar-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.7"/><path d="M10 6.5V10L12.5 11.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         </div>
         <h3>Analyze</h3>
-        <p>Patterns across time, category, and channel surface recurring issues before they become trends.</p>
+        <p>Patterns across time, category, and channel surface recurring issues before they become trends that hurt retention.</p>
       </div>
-      <div class="card">
-        <div class="icon-badge">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 14V5.5C3 4.7 3.7 4 4.5 4H13.5C14.3 4 15 4.7 15 5.5V11C15 11.8 14.3 12.5 13.5 12.5H7L3 14Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <div class="pillar">
+        <div class="pillar-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 15V7C4 5.9 4.9 5 6 5H14C15.1 5 16 5.9 16 7V12C16 13.1 15.1 14 14 14H8L4 15Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
         </div>
         <h3>Respond</h3>
-        <p>The assistant gives an instant first reply, while flagged issues route straight to the right person.</p>
+        <p>The AI assistant gives an instant first-pass reply, while flagged issues route straight to the right support agent.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ================= CONTACT ================= -->
-<section id="contact" class="section-alt">
-  <div class="container grid-2">
-    <div>
+<!-- ═══════════════ CONTACT ═══════════════ -->
+<section id="contact" class="contact-section">
+  <div class="container contact-grid">
+    <div class="contact-info">
       <span class="eyebrow">Contact us</span>
       <h2>Have a question?</h2>
-      <p>Reach out any time — a real person on our team reads every message and typically replies within one business day.</p>
-      <div class="card" style="margin-top: 1.5rem;">
-        <h3>Reach the team</h3>
-        <p style="margin-bottom: 0.3rem;">hello@loopline.io</p>
-        <p style="margin: 0;">Mon–Fri, 9am–6pm</p>
+      <p>Reach out any time. A real person reads every message and typically replies within one business day.</p>
+      <div class="contact-detail">
+        <strong>Email</strong>
+        <span>hello@loopline.io</span>
+      </div>
+      <div class="contact-detail" style="border-top:none; margin-top:1px;">
+        <strong>Hours</strong>
+        <span>Mon–Fri, 9am–6pm MMT</span>
       </div>
     </div>
-    <form class="card" id="contact-form">
+    <form id="contact-form">
       <div class="field">
         <label for="c-name">Name</label>
         <input id="c-name" type="text" placeholder="Your name" required>
@@ -136,25 +401,21 @@
   </div>
 </section>
 
-<!-- ================= SURVEY ================= -->
-<section id="survey">
-  <div class="container">
-    <div class="section-head">
-      <span class="eyebrow">Survey</span>
+<!-- ═══════════════ SURVEY ═══════════════ -->
+<section id="survey" class="survey-section">
+  <div class="container survey-inner">
+    <div class="survey-copy">
+      <span class="eyebrow">Quick survey</span>
       <h2>Tell us about a recent issue</h2>
-      <p>A quick, structured way to describe what went wrong — this is what keeps the issue pulse above accurate and current.</p>
+      <p>A structured way to describe what went wrong — this is what keeps the issue pulse accurate and current. Sign in to submit.</p>
+
+      <div class="gate-banner" id="survey-gate" style="display:none;">
+        <p>Sign in to fill out the survey.</p>
+        <a href="login.html" class="btn btn-amber btn-sm" style="white-space:nowrap;">Sign in</a>
+      </div>
     </div>
 
-    <div class="illus-wrap" style="max-width: 220px; margin-bottom: 24px;">
-      <img src="img/clipboard-check.svg" alt="Illustration of a clipboard with a checkmark">
-    </div>
-
-    <div class="gate-banner" id="survey-gate">
-      <p>Sign in to fill out the survey.</p>
-      <a href="login.html" class="btn btn-primary btn-sm">Sign in</a>
-    </div>
-
-    <form class="card" id="survey-form" style="max-width: 560px; display: none;">
+    <form id="survey-form" class="survey-form-bare" style="display:none;">
       <div class="field">
         <label>How satisfied were you with the resolution?</label>
         <div class="rating-scale" id="rating-scale">
@@ -178,23 +439,40 @@
       </div>
       <div class="field">
         <label for="s-comment">Tell us more</label>
-        <textarea id="s-comment" placeholder="Describe what happened..."></textarea>
+        <textarea id="s-comment" rows="4" placeholder="Describe what happened..."></textarea>
       </div>
       <button type="submit" class="btn btn-primary btn-block">Submit survey</button>
-      <p class="form-note">Your response is kept private and used only to improve support.</p>
+      <p class="form-note" style="margin-top:10px;">Your response is private and used only to improve support.</p>
     </form>
+
+    <!-- Shown to guests instead of the form -->
+    <div id="survey-guest-cta" style="display:none;">
+      <div style="padding:32px; background:var(--bg); border-radius:var(--radius-md); text-align:center;">
+        <p style="font-size:1rem; margin-bottom:1.25rem; color:var(--ink);">Sign in to submit a survey response.</p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <a href="login.html"  class="btn btn-primary btn-sm">Log in</a>
+          <a href="signup.html" class="btn btn-ghost btn-sm">Create account</a>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ================= FOOTER ================= -->
-<footer>
-  <div class="container footer-inner">
-    <span>© 2026 Loopline. All rights reserved.</span>
-    <span>Built for teams who listen.</span>
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="footer-v2">
+  <div class="container footer-inner-v2">
+    <div class="footer-brand">
+      <svg viewBox="0 0 26 26" fill="none" style="width:20px;height:20px;">
+        <circle cx="13" cy="13" r="12" stroke="rgba(255,255,255,.5)" stroke-width="1.6"/>
+        <path d="M5 13.5H9.5L11.5 8L14.5 18L16.5 13.5H21" stroke="rgba(255,255,255,.7)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Loopline
+    </div>
+    <span>© 2026 Loopline. Built for teams who listen.</span>
   </div>
 </footer>
 
-<!-- ================= AI CHAT WIDGET ================= -->
+<!-- ═══════════════ AI CHAT WIDGET ═══════════════ -->
 <button class="chat-launcher" id="chat-launcher" aria-label="Open Loop Assistant">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6.5C4 5.1 5.1 4 6.5 4H17.5C18.9 4 20 5.1 20 6.5V14.5C20 15.9 18.9 17 17.5 17H9L5 20V17H6.5C5.1 17 4 15.9 4 14.5V6.5Z" stroke="white" stroke-width="1.6" stroke-linejoin="round"/></svg>
 </button>
