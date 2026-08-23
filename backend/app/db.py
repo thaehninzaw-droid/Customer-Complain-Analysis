@@ -38,14 +38,22 @@ class _InMemoryCollection:
     def insert_one(self, doc):
         doc = dict(doc)
         doc["_id"] = next(self._ids)
-        # Guard against duplicate insertion on hot-reload: if a doc with
-        # the same user_id or email already exists, skip silently.
-        if "user_id" in doc:
-            if any(d.get("user_id") == doc["user_id"] for d in self._docs):
-                return doc  # already present, don't duplicate
-        if "email" in doc and doc.get("role") == "admin":
-            if any(d.get("email") == doc["email"] for d in self._docs):
-                return doc  # admin already seeded
+        # Dedup guard for hot-reload: only applies to user documents
+        # (which always have a 'role' field). Complaint documents also
+        # carry user_id but must never be blocked by this check.
+        if "role" in doc:
+            # Admin: deduplicate by email
+            if doc.get("role") == "admin":
+                if any(d.get("email") == doc["email"] for d in self._docs):
+                    return doc
+            # Customer: deduplicate by email (not user_id — that's assigned
+            # by the API layer which already checks for uniqueness)
+            else:
+                if any(
+                    d.get("role") == doc["role"] and d.get("email") == doc.get("email")
+                    for d in self._docs
+                ):
+                    return doc
         self._docs.append(doc)
         return doc
 
@@ -87,13 +95,21 @@ class _InMemoryCollection:
         return {k: v for k, v in doc.items() if k in include}
 
     def find(self, query=None, projection=None):
-        # Deduplicate by _id as a safety net against hot-reload duplication.
-        seen = set()
+        # Deduplicate documents. Strategy per doc type:
+        # - Users (have 'email' + 'role'): deduplicate by email
+        # - Complaints (have 'ticket_no'): deduplicate by ticket_no
+        # - Others: deduplicate by _id
+        seen: set = set()
         unique_docs = []
         for d in self._docs:
-            oid = d.get("_id")
-            if oid not in seen:
-                seen.add(oid)
+            if "role" in d and "email" in d:
+                key = ("user", d["email"])
+            elif "ticket_no" in d:
+                key = ("complaint", d["ticket_no"])
+            else:
+                key = ("other", d.get("_id"))
+            if key not in seen:
+                seen.add(key)
                 unique_docs.append(d)
         if not query:
             return [self._project(d, projection) for d in unique_docs]
