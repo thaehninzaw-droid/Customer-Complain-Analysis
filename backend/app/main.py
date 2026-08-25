@@ -541,6 +541,18 @@ def list_customers_admin(
                  if sl in u.get("username", "").lower()
                  or sl in u.get("email", "").lower()]
 
+    # Defensive deduplication by user_id.
+    # Protects against accidental duplicate documents in MongoDB
+    # (no unique index) or rare race conditions during signup.
+    seen_ids: set[int] = set()
+    unique_users = []
+    for u in users:
+        uid = u.get("user_id")
+        if uid is not None and uid not in seen_ids:
+            seen_ids.add(uid)
+            unique_users.append(u)
+    users = unique_users
+
     users.sort(key=lambda u: u.get("joined", ""), reverse=True)
 
     total = len(users)

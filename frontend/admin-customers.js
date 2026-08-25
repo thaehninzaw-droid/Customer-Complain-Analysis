@@ -9,6 +9,7 @@ let _page          = 1;
 const PAGE_SIZE    = 20;
 let _search        = '';
 let _debounceTimer = null;
+let _abortController = null;   // cancels in-flight search requests
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function escapeHtml(s) {
@@ -38,6 +39,14 @@ async function loadCustomers() {
   const loader = document.getElementById('cust-loading');
   const pag    = document.getElementById('cust-pagination');
 
+  // Cancel any previous in-flight request so overlapping searches
+  // cannot leave duplicate rows in the table.
+  if (_abortController) {
+    _abortController.abort();
+  }
+  _abortController = new AbortController();
+  const signal = _abortController.signal;
+
   tbody.innerHTML    = '';
   empty.style.display  = 'none';
   loader.style.display = 'block';
@@ -47,7 +56,10 @@ async function loadCustomers() {
   if (_search.trim()) params.set('search', _search.trim());
 
   try {
-    const data = await adminFetch(`/admin/customers?${params}`);
+    const data = await adminFetch(`/admin/customers?${params}`, { signal });
+    // Ignore responses that belong to an aborted request
+    if (signal.aborted) return;
+
     loader.style.display = 'none';
     updateStats(data);
 
@@ -101,6 +113,9 @@ async function loadCustomers() {
     pag.style.display = 'flex';
 
   } catch (err) {
+    // AbortError is expected when we cancel a previous search — ignore it
+    if (err.name === 'AbortError' || signal.aborted) return;
+
     loader.style.display = 'none';
     empty.textContent    = err.message || 'Failed to load customers.';
     empty.style.display  = 'block';
