@@ -11,24 +11,9 @@ const CATEGORY_COLORS = ['#3F8489','#FFC94A','#D64545','#8695A4','#2C5F63','#a78
 const STATUS_COLORS   = { 'Pending':'#FFC94A','In Progress':'#3F8489','Resolved':'#2C5F63','Closed':'#8695A4' };
 const PRIORITY_COLORS = { 'Low':'#2C5F63','Medium':'#FFC94A','High':'#D64545' };
 
-// ─── CFPB Banking baseline data (12,000 complaints) ────────────────────────
-const BASELINE = {
-  total: 2224,
-  open: 847,
-  closed: 1377,
-  trend: { delta: -981 },
-  monthly_volume: [
-    {month:'25-01',count:215},{month:'25-02',count:198},{month:'25-03',count:231},
-    {month:'25-04',count:187},{month:'25-05',count:203},{month:'25-06',count:176},
-    {month:'25-07',count:189},{month:'25-08',count:162},{month:'25-09',count:194},
-    {month:'25-10',count:208},{month:'25-11',count:148},{month:'25-12',count:113},
-  ],
-  by_category: {
-    'Cards':612,'Accounts':387,'Loans':498,'Collections & Credit reporting':248,'Other banking':479,
-  },
-  by_priority: { 'Low':704,'Medium':889,'High':631 },
-  by_status:   { 'Pending':312,'In Progress':535,'Resolved':1021,'Closed':356 },
-};
+// Baseline charts now come from GET /admin/analytics/baseline (the CSV).
+// Do not hardcode 2224 — that was the old Comcast count.
+let _baselineData = null;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let _currentSource = 'baseline'; // 'baseline' | 'live'
@@ -296,7 +281,10 @@ function setSourcePill(source, liveTotal) {
   if (!pill) return;
   if (source === 'baseline') {
     pill.className = 'ds-source-pill baseline';
-    pill.textContent = 'CFPB Banking · 12,000 complaints';
+    const n = liveTotal || (_baselineData && _baselineData.total) || 0;
+    pill.textContent = n
+      ? `CFPB Banking · ${n.toLocaleString()} complaints`
+      : 'CFPB Banking dataset';
   } else {
     pill.className = 'ds-source-pill live';
     pill.textContent = `Live Data · ${(liveTotal||0).toLocaleString()} complaints`;
@@ -310,8 +298,12 @@ function switchDataSource(source) {
   document.getElementById('btn-live').classList.toggle('active', source === 'live');
 
   if (source === 'baseline') {
-    applyAnalytics(BASELINE);
-    setSourcePill('baseline');
+    if (_baselineData) {
+      applyAnalytics(_baselineData);
+      setSourcePill('baseline', _baselineData.total);
+    } else {
+      fetchAndRenderBaseline();
+    }
   } else {
     if (_liveData) {
       applyAnalytics(_liveData);
@@ -378,7 +370,21 @@ async function loadMlStatus() {
 }
 
 // ─── Analytics: live fetch + render ─────────────────────────────────────────
+async function fetchAndRenderBaseline() {
+  try {
+    const data = await adminFetch('/admin/analytics/baseline');
+    _baselineData = data;
+    if (_currentSource === 'baseline') {
+      applyAnalytics(data);
+      setSourcePill('baseline', data.total);
+    }
+  } catch (e) {
+    console.warn('Could not load baseline analytics', e);
+  }
+}
+
 async function fetchAndRenderLive() {
+
   try {
     const data = await adminFetch('/admin/analytics');
     _liveData = data;

@@ -513,6 +513,15 @@ def admin_analytics(admin_id: int = Depends(get_current_admin_id)):
     return compute_analytics(docs)
 
 
+@app.get("/admin/analytics/baseline")
+def admin_analytics_baseline(admin_id: int = Depends(get_current_admin_id)):
+    """Charts for the CFPB banking CSV (12k), not the live Mongo/in-memory
+    collection. Live DB can still be the old 2224 Comcast rows if nobody
+    re-imported; this endpoint always reads banking_complaints.csv via
+    get_baseline()."""
+    return compute_analytics(get_baseline())
+
+
 @app.get("/admin/ml-status")
 def admin_ml_status(admin_id: int = Depends(get_current_admin_id)):
     """Lets the admin dashboard show whether Algorithm 1/2 are running
