@@ -509,7 +509,12 @@ function renderComplaintTable(filterText) {
   const me = typeof llFindCurrentUser === 'function' ? llFindCurrentUser() : null;
   if (!me) return;
   const list = llGetCurrentUserComplaints();
-  const sorted = [...list].sort((a, b) => Number(a.ticket_no) - Number(b.ticket_no));
+  const sorted = [...list].sort((a, b) => {
+    const da = Date.parse(a.date_month_year || '') || 0;
+    const db = Date.parse(b.date_month_year || '') || 0;
+    if (db !== da) return db - da; // newest date first
+    return Number(b.ticket_no) - Number(a.ticket_no);
+  });
   let rows = sorted;
   if (filterText) {
     const f = filterText.toLowerCase();
