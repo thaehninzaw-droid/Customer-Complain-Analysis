@@ -35,7 +35,9 @@ function llAuthHeaders() {
   return { Authorization: `Bearer ${session.token}` };
 }
 function llFormatMonthYear(isoDate) {
+  if (!isoDate) return '—';
   const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return '—';
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   return `${months[d.getMonth()]} ${d.getFullYear()}`;
 }
@@ -208,7 +210,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const session = llGetSession();
 
   // --- Gate: activities page is only for logged in users ---
-  const onActivitiesPage = !!document.getElementById('complaint-table');
+  // After the card-list rewrite, #complaint-table no longer exists.
+  // Detect the page by URL or by the profile-card / complaint list ids.
+  const onActivitiesPage = /activities\.html(?:$|[?#])/.test(window.location.pathname)
+    || !!document.getElementById('profile-name')
+    || !!document.getElementById('complaint-tbody')
+    || !!document.getElementById('complaint-table');
   if (onActivitiesPage && !session) {
     if (typeof showToast === 'function') showToast('Please log in to view Activities.');
     window.location.href = 'login.html';
@@ -255,10 +262,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileEmailEl = document.getElementById('profile-email');
   const profileJoinedEl = document.getElementById('profile-joined');
   if (onActivitiesPage && session) {
-    const user = session.user;
-    if (profileNameEl) profileNameEl.textContent = user.username;
-    if (profileEmailEl) profileEmailEl.textContent = user.email;
-    if (profileJoinedEl) profileJoinedEl.textContent = llFormatMonthYear(user.joined);
+    const user = session.user || {};
+    if (profileNameEl) profileNameEl.textContent = user.username || user.name || '—';
+    if (profileEmailEl) profileEmailEl.textContent = user.email || '—';
+    if (profileJoinedEl) profileJoinedEl.textContent = llFormatMonthYear(user.joined || user.created_at);
   }
 
   // --- Survey gate on index.html ---

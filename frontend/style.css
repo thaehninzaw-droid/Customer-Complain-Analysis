@@ -867,47 +867,68 @@ footer {
   color: var(--ink);
   vertical-align: top;
 }
-/* ── Column budget — 9 cols total — all fit at 960px+ viewport ─────────
-   Budget:  76 + 94 + 68 + clamp + 98 + 64 + 90 + 78 + 72 = ~640px fixed;
-   the complaint column takes the remainder and never overflows.
+/* ── Admin complaints table (#admin-table) column budget ───────────────
+   Scoped to #admin-table so the customers table does not inherit these
+   widths (that collision made Email/Joined/Actions overlap).
+   Priority + Status must fit a pill <select> ("Low", "In Progress").
    ─────────────────────────────────────────────────────────────────────── */
-.complaint-table { table-layout: fixed; width: 100%; }
+#admin-table.complaint-table { table-layout: fixed; width: 100%; min-width: 1080px; }
 
 /* 1 — Ticket # */
-.complaint-table td:nth-child(1),
-.complaint-table th:nth-child(1) { width: 80px; white-space: nowrap; }
+#admin-table th:nth-child(1),
+#admin-table td:nth-child(1) { width: 88px; white-space: nowrap; }
 
-/* 2 — Category chip */
-.complaint-table td:nth-child(2),
-.complaint-table th:nth-child(2) { width: 100px; }
+/* 2 — Category */
+#admin-table th:nth-child(2),
+#admin-table td:nth-child(2) { width: 132px; }
 
-/* 3 — Priority badge */
-.complaint-table td:nth-child(3),
-.complaint-table th:nth-child(3) { width: 76px; white-space: nowrap; }
+/* 3 — Priority (needs room for "Medium" + native select arrow) */
+#admin-table th:nth-child(3),
+#admin-table td:nth-child(3) { width: 128px; white-space: nowrap; overflow: visible; }
 
-/* 4 — Complaint text: fills remaining space, NEVER expands table */
-.complaint-table td:nth-child(4),
-.complaint-table th:nth-child(4) { min-width: 0; }
+/* 4 — Complaint text */
+#admin-table th:nth-child(4),
+#admin-table td:nth-child(4) { min-width: 0; }
 
 /* 5 — Date */
-.complaint-table td:nth-child(5),
-.complaint-table th:nth-child(5) { width: 100px; white-space: nowrap; }
+#admin-table th:nth-child(5),
+#admin-table td:nth-child(5) { width: 108px; white-space: nowrap; }
 
 /* 6 — City */
-.complaint-table td:nth-child(6),
-.complaint-table th:nth-child(6) { width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#admin-table th:nth-child(6),
+#admin-table td:nth-child(6) { width: 88px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 7 — Received Via */
-.complaint-table td:nth-child(7),
-.complaint-table th:nth-child(7) { width: 88px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 7 — Via */
+#admin-table th:nth-child(7),
+#admin-table td:nth-child(7) { width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 8 — Status */
-.complaint-table td:nth-child(8),
-.complaint-table th:nth-child(8) { width: 110px; }
+/* 8 — Status (needs room for "In Progress") */
+#admin-table th:nth-child(8),
+#admin-table td:nth-child(8) { width: 148px; white-space: nowrap; overflow: visible; }
 
 /* 9 — Actions */
-.complaint-table td:nth-child(9),
-.complaint-table th:nth-child(9) { width: 72px; white-space: nowrap; }
+#admin-table th:nth-child(9),
+#admin-table td:nth-child(9) { width: 84px; white-space: nowrap; }
+
+/* ── Customers table — own column plan, not the 9-col complaint budget ─ */
+#cust-table.complaint-table,
+#cust-table.customers-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 860px;
+}
+#cust-table th:nth-child(1),
+#cust-table td:nth-child(1) { width: 88px; white-space: nowrap; }
+#cust-table th:nth-child(2),
+#cust-table td:nth-child(2) { width: 160px; overflow: hidden; text-overflow: ellipsis; }
+#cust-table th:nth-child(3),
+#cust-table td:nth-child(3) { width: auto; min-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cust-table th:nth-child(4),
+#cust-table td:nth-child(4) { width: 120px; white-space: nowrap; }
+#cust-table th:nth-child(5),
+#cust-table td:nth-child(5) { width: 110px; text-align: center; }
+#cust-table th:nth-child(6),
+#cust-table td:nth-child(6) { width: 110px; white-space: nowrap; }
 .complaint-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -1884,17 +1905,22 @@ footer {
   border-left-color: var(--teal);
 }
 
-/* Inline selects — match pill height */
+/* Inline selects — match pill height; must show full Low/Medium/High */
 .inline-select {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  padding: 4px 8px;
+  padding: 4px 22px 4px 8px;
   border-radius: 100px;
   border: 1px solid var(--line);
   background: var(--surface);
   cursor: pointer;
-  max-width: 100%;
+  width: auto;
+  min-width: 104px;
+  max-width: none;
+  box-sizing: border-box;
 }
+#admin-table td:nth-child(3) .inline-select { min-width: 104px; } /* Priority */
+#admin-table td:nth-child(8) .inline-select { min-width: 124px; } /* Status */
 
 /* Priority badges in admin table */
 .inline-label.priority-high   { background: #FEF2F2; color: #B91C1C; border-color: #FCA5A5; }
