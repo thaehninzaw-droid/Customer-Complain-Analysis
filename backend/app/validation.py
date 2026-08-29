@@ -28,7 +28,7 @@ from typing import Optional
 from .cities import CITY_NAMES
 
 MIN_COMPLAINT_LENGTH = 20
-MAX_COMPLAINT_LENGTH = 1000
+MAX_COMPLAINT_LENGTH = 2000
 
 
 class ComplaintValidationError(Exception):

@@ -357,8 +357,8 @@ function isMeaningfulComplaint(text) {
   if (t.length < 20) {
     return { ok: false, reason: `Please add more detail (${t.length}/20 characters minimum).` };
   }
-  if (t.length > 1000) {
-    return { ok: false, reason: `Description too long (${t.length}/1000 characters maximum).` };
+  if (t.length > 2000) {
+    return { ok: false, reason: `Description too long (${t.length}/2000 characters maximum).` };
   }
   if (containsProfanity(t)) {
     return { ok: false, reason: 'Please avoid offensive or inappropriate language.' };
