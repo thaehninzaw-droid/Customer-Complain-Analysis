@@ -531,46 +531,51 @@ function renderComplaintTable(filterText) {
     return;
   }
   if (empty) empty.style.display = 'none';
-  // Priority badge colours (customer view shows priority, not category — Decision 34)
-  const priorityColorMap = {
-    'High': { bg: '#FDECEA', color: '#C0392B' },
-    'Medium': { bg: '#FEF9E7', color: '#9A7D0A' },
-    'Low': { bg: '#E8F8F5', color: '#1A5276' },
+  // ── Apple-tier card-list renderer (replaces horizontal table) ──
+  const priClass = { High:'badge-pri-high', Medium:'badge-pri-medium', Low:'badge-pri-low' };
+  const statusBadgeClass = {
+    Pending: 'badge-status-pending',
+    'In Progress': 'badge-status-progress',
+    Resolved: 'badge-status-resolved',
+    Closed: 'badge-status-closed',
   };
+
   rows.forEach(c => {
-    const tr = document.createElement('tr');
-    tr.className = 'complaint-row';
-    tr.style.cursor = 'pointer';
-    tr.dataset.ticket = String(c.ticket_no);
-    tr.title = 'Click to view details';
-    const statusClass = ['Resolved', 'Closed'].includes(c.status) ? 'resolved' : 'pending';
-    const priBadge = priorityColorMap[c.priority] || { bg: 'var(--teal-tint)', color: 'var(--teal-dark)' };
-    const priStyle = `display:inline-block;padding:3px 9px;border-radius:100px;font-family:var(--font-mono);font-size:0.72rem;background:${priBadge.bg};color:${priBadge.color};`;
-    const safeComplaint = (c.complaint || '').replace(/"/g, '&quot;');
-    tr.innerHTML = `
-      <td><span class="ticket-no">#${c.ticket_no}</span></td>
-      <td><div class="complaint-text" title="${safeComplaint}">${c.complaint || ''}</div></td>
-      <td style="white-space:nowrap;font-family:var(--font-mono);font-size:0.84rem;color:var(--ink-soft);">${formatDateDisplay(c.date_month_year)}</td>
-      <td><span style="${priStyle}">${c.priority || 'Low'}</span></td>
-      <td><span class="status-badge ${statusClass}">${c.status || 'Pending'}</span></td>
-      <td>
-        <div class="row-actions" style="display:flex;gap:6px;">
-          <button type="button" class="row-btn row-btn-view" data-action="view" data-ticket="${c.ticket_no}" title="View details">👁 View</button>
+    const li = document.createElement('li');
+    li.className = 'clist-row';
+    li.dataset.ticket = String(c.ticket_no);
+    const pri   = c.priority || 'Low';
+    const stat  = c.status   || 'Pending';
+    const pCls  = priClass[pri]  || 'badge-pri-low';
+    const sCls  = statusBadgeClass[stat] || 'badge-status-pending';
+    const safeText = (c.complaint || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    li.innerHTML = `
+      <div class="clist-left">
+        <span class="clist-ticket">#${c.ticket_no}</span>
+        <span class="clist-date">${formatDateDisplay(c.date_month_year)}</span>
+      </div>
+      <div class="clist-mid">
+        <div class="clist-text" title="${safeText}">${safeText}</div>
+        <div class="clist-badges">
+          <span class="badge ${pCls}">${pri}</span>
+          <span class="badge ${sCls}">${stat}</span>
         </div>
-      </td>
+      </div>
+      <div class="clist-right">
+        <button type="button" class="clist-view-btn" data-action="view" data-ticket="${c.ticket_no}">View →</button>
+      </div>
     `;
-    tr.addEventListener('click', (e) => {
+
+    li.addEventListener('click', (e) => {
       if (e.target.closest('[data-action]')) return;
       openViewModal(Number(c.ticket_no));
     });
-    tbody.appendChild(tr);
-  });
-
-  tbody.querySelectorAll('[data-action="view"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    li.querySelector('[data-action="view"]').addEventListener('click', (e) => {
       e.stopPropagation();
-      openViewModal(Number(btn.dataset.ticket));
+      openViewModal(Number(c.ticket_no));
     });
+    tbody.appendChild(li);
   });
 }
 

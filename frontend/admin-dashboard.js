@@ -466,8 +466,25 @@ function renderTable(items, readOnly = false) {
     if (readOnly) tr.classList.add('baseline-row');
 
     // In baseline (read-only) mode, show labels instead of editable selects
+    // Abbreviate labels + colour classes — defined here before any cell uses them
+    const catAbbr = {
+      'Collections & Credit reporting': 'Collections',
+      'Other banking': 'Other',
+      'Cards': 'Cards',
+      'Accounts': 'Accounts',
+      'Loans': 'Loans',
+    };
+    const catShort = catAbbr[c.category] || escapeHtml(c.category);
+    const viaShort = (c.received_via||'Web')
+      .replace('Web Form','Web').replace('Phone Call','Phone')
+      .replace('Manual Entry','Manual');
+    const catClassMap = {
+      'Cards': 'cat-cards', 'Accounts': 'cat-accounts', 'Loans': 'cat-loans',
+      'Collections & Credit reporting': 'cat-collections', 'Other banking': 'cat-other',
+    };
+    const catCls = catClassMap[c.category] || '';
     const categoryCell = readOnly
-      ? `<span class="inline-label">${escapeHtml(c.category)}</span>`
+      ? `<span class="inline-label ${catCls}" title="${escapeHtml(c.category)}">${catShort}</span>`
       : `<select class="inline-select" data-field="category" data-ticket="${c.ticket_no}">
           ${['Cards','Accounts','Loans','Collections & Credit reporting','Other banking'].map(cat =>
             `<option value="${cat}" ${cat===c.category?'selected':''}>${cat}</option>`).join('')}
@@ -488,16 +505,16 @@ function renderTable(items, readOnly = false) {
         </select>`;
 
     tr.innerHTML = `
-      <td class="ticket-no">#${c.ticket_no}</td>
+      <td><span class="ticket-no">#${c.ticket_no}</span></td>
       <td>${categoryCell}</td>
       <td>${priorityCell}</td>
       <td><div class="complaint-text" title="${escapeHtml(c.complaint)}">${escapeHtml(c.complaint)}</div></td>
-      <td>${escapeHtml(c.date_month_year)}</td>
-      <td>${escapeHtml(c.city||'—')}</td>
-      <td>${escapeHtml(c.received_via)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.79rem;color:var(--ink-soft);white-space:nowrap;">${escapeHtml(c.date_month_year||'—')}</td>
+      <td style="font-size:0.82rem;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.city||'—')}</td>
+      <td style="font-size:0.79rem;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(viaShort)}</td>
       <td>${statusCell}</td>
       <td>
-        <button type="button" class="row-btn row-btn-view" data-action="view" data-ticket="${c.ticket_no}">👁 View</button>
+        <button type="button" class="row-btn row-btn-view" data-action="view" data-ticket="${c.ticket_no}">View</button>
       </td>
     `;
     tbody.appendChild(tr);

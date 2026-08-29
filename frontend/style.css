@@ -816,16 +816,23 @@ footer {
   overflow: hidden;
 }
 .table-head {
-  padding: 24px 24px 16px;
+  padding: 22px 24px 18px;
   border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .table-head h3 {
   margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
 }
 
 .table-wrap {
-  overflow-x: auto;
-  padding: 0 24px 24px;
+  overflow-x: auto;   /* last resort safety valve, should not trigger */
+  padding: 0;
 }
 
 .complaint-table {
@@ -860,17 +867,47 @@ footer {
   color: var(--ink);
   vertical-align: top;
 }
-/* Per-column width constraints so columns don't crowd or spread too wide */
-.complaint-table td:nth-child(1)  { white-space: nowrap; width: 90px; }   /* Ticket # */
-.complaint-table td:nth-child(2)  { width: 100px; }                       /* Category */
-.complaint-table td:nth-child(3)  { max-width: 200px; }                   /* Complaint */
+/* ── Column budget — 9 cols total — all fit at 960px+ viewport ─────────
+   Budget:  76 + 94 + 68 + clamp + 98 + 64 + 90 + 78 + 72 = ~640px fixed;
+   the complaint column takes the remainder and never overflows.
+   ─────────────────────────────────────────────────────────────────────── */
+.complaint-table { table-layout: fixed; width: 100%; }
+
+/* 1 — Ticket # */
+.complaint-table td:nth-child(1),
+.complaint-table th:nth-child(1) { width: 80px; white-space: nowrap; }
+
+/* 2 — Category chip */
+.complaint-table td:nth-child(2),
+.complaint-table th:nth-child(2) { width: 100px; }
+
+/* 3 — Priority badge */
+.complaint-table td:nth-child(3),
+.complaint-table th:nth-child(3) { width: 76px; white-space: nowrap; }
+
+/* 4 — Complaint text: fills remaining space, NEVER expands table */
 .complaint-table td:nth-child(4),
-.complaint-table td:nth-child(5)  { white-space: nowrap; width: 100px; }  /* Date, Time */
-.complaint-table td:nth-child(6)  { white-space: nowrap; width: 80px; }   /* City */
-.complaint-table td:nth-child(7)  { white-space: nowrap; width: 110px; }  /* State */
-.complaint-table td:nth-child(8)  { white-space: nowrap; width: 70px; }   /* Zip */
-.complaint-table td:nth-child(9)  { width: 100px; }                       /* Status */
-.complaint-table td:nth-child(10) { width: 70px; }                        /* Actions */
+.complaint-table th:nth-child(4) { min-width: 0; }
+
+/* 5 — Date */
+.complaint-table td:nth-child(5),
+.complaint-table th:nth-child(5) { width: 100px; white-space: nowrap; }
+
+/* 6 — City */
+.complaint-table td:nth-child(6),
+.complaint-table th:nth-child(6) { width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 7 — Received Via */
+.complaint-table td:nth-child(7),
+.complaint-table th:nth-child(7) { width: 88px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 8 — Status */
+.complaint-table td:nth-child(8),
+.complaint-table th:nth-child(8) { width: 110px; }
+
+/* 9 — Actions */
+.complaint-table td:nth-child(9),
+.complaint-table th:nth-child(9) { width: 72px; white-space: nowrap; }
 .complaint-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -884,11 +921,15 @@ footer {
 }
 .complaint-table .complaint-text {
   color: var(--ink-soft);
+  font-size: 0.86rem;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* hard cap — prevents the column from ever widening the table */
+  max-width: 100%;
+  word-break: break-word;
 }
 
 .status-badge {
@@ -1564,21 +1605,30 @@ footer {
 /* ---- Filter bar ---- */
 .filter-bar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 16px;
+  padding: 14px 24px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0;
 }
 .filter-bar select {
   font-family: var(--font-body);
-  font-size: 0.86rem;
-  padding: 8px 12px;
+  font-size: 0.83rem;
+  padding: 7px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
+  min-width: 0;
+  flex-shrink: 1;
 }
-.filter-bar .search-wrap { flex: 1 1 240px; min-width: 200px; }
+.filter-bar .search-wrap { flex: 1 1 200px; min-width: 160px; }
+.filter-bar .search-wrap input {
+  font-size: 0.86rem;
+  padding: 8px 12px 8px 38px;
+}
 .filter-clear {
   font-family: var(--font-body);
   font-size: 0.82rem;
@@ -1604,14 +1654,20 @@ footer {
 /* Baseline (read-only) table rows — historical CSV data, not editable */
 .baseline-row td { opacity: 0.9; }
 .inline-label {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
-  padding: 4px 8px;
+  font-size: 0.7rem;
+  padding: 3px 8px;
   border-radius: 100px;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink-soft);
+  /* never wrap or overflow the column */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .inline-label.pending   { background: var(--amber-tint); color: #92600a; border-color: var(--amber); }
 .inline-label.resolved  { background: var(--teal-tint);  color: var(--teal-dark); border-color: var(--teal); }
@@ -1794,3 +1850,94 @@ footer {
   border-radius: 8px;
 }
 .pw-toggle:hover { color: var(--teal-dark); background: var(--teal-tint); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   Admin table — Apple-tier polish (UI-2026 revision)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Category chip colours — one shade per banking category */
+.inline-label[title="Cards"],
+.cat-cards    { background: #EEF2FF; color: #3730A3; border-color: #C7D2FE; }
+.inline-label[title="Accounts"],
+.cat-accounts { background: #ECFDF5; color: #065F46; border-color: #A7F3D0; }
+.inline-label[title="Loans"],
+.cat-loans    { background: #FFF7ED; color: #92400E; border-color: #FDE68A; }
+.inline-label[title*="Collections"],
+.cat-collections { background: #FDF2F8; color: #831843; border-color: #F9A8D4; }
+.inline-label[title="Other banking"],
+.cat-other    { background: var(--surface-raised); color: var(--ink-soft); border-color: var(--line); }
+
+/* Admin table vertical rhythm */
+.complaint-table tbody td {
+  padding: 13px 14px;
+  vertical-align: middle;  /* centre badges/controls vertically */
+}
+
+/* Row hover: lift the row with a left accent line */
+.complaint-table tbody tr {
+  transition: background 0.12s ease;
+  border-left: 3px solid transparent;
+}
+.complaint-table tbody tr:hover {
+  background: #F6FAFA;
+  border-left-color: var(--teal);
+}
+
+/* Inline selects — match pill height */
+.inline-select {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  max-width: 100%;
+}
+
+/* Priority badges in admin table */
+.inline-label.priority-high   { background: #FEF2F2; color: #B91C1C; border-color: #FCA5A5; }
+.inline-label.priority-medium { background: #FFFBEB; color: #92400E; border-color: #FCD34D; }
+.inline-label.priority-low    { background: #F0FDFA; color: #134E4A; border-color: #99F6E4; }
+
+/* Status labels in admin baseline view */
+.inline-label.pending    { background: #FFFBEB; color: #92400E; border-color: #FCD34D; }
+.inline-label.resolved   { background: #F0FDFA; color: #134E4A; border-color: #99F6E4; }
+
+/* Table card rounded corners and shadow lift */
+.table-card {
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(27,36,48,.04), 0 8px 32px rgba(27,36,48,.08);
+  border: 1px solid rgba(215,222,229,.7);
+  overflow: hidden;
+}
+
+/* Pagination — Apple-style pill buttons */
+.pagination button {
+  border-radius: 100px;
+  padding: 6px 18px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: all 0.14s;
+}
+.pagination button:not(:disabled):hover {
+  background: var(--teal-dark);
+  color: #fff;
+  border-color: var(--teal-dark);
+}
+
+/* View button refinement */
+.row-btn-view {
+  background: #EEF2FF;
+  color: #3730A3;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  padding: 5px 11px;
+  font-weight: 500;
+  transition: background 0.13s, transform 0.1s;
+}
+.row-btn-view:hover  { background: #C7D2FE; }
+.row-btn-view:active { transform: translateY(1px); }
