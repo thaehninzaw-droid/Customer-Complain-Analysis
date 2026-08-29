@@ -227,52 +227,63 @@ function svgHBarChart(hostId, labels, values, colors) {
 
 // ─── Apply analytics data to UI ──────────────────────────────────────────────
 function applyAnalytics(data) {
-  // Stat cards
-  document.getElementById('stat-total').textContent = (data.total ?? '–').toLocaleString();
-  const open   = (data.by_status['Pending']||0) + (data.by_status['In Progress']||0);
-  const closed = (data.by_status['Resolved']||0) + (data.by_status['Closed']||0);
-  document.getElementById('stat-open').textContent   = open.toLocaleString();
-  document.getElementById('stat-closed').textContent = closed.toLocaleString();
+  if (!data || typeof data !== 'object') return;
+  const byStatus = data.by_status || {};
+  const byCategory = data.by_category || {};
+  const byPriority = data.by_priority || {};
+  const monthly = Array.isArray(data.monthly_volume) ? data.monthly_volume : [];
 
-  // Trend pill
+  const totalEl = document.getElementById('stat-total');
+  if (totalEl) totalEl.textContent = (data.total ?? 0).toLocaleString();
+  const open   = (byStatus['Pending']||0) + (byStatus['In Progress']||0);
+  const closed = (byStatus['Resolved']||0) + (byStatus['Closed']||0);
+  const openEl = document.getElementById('stat-open');
+  const closedEl = document.getElementById('stat-closed');
+  if (openEl) openEl.textContent = open.toLocaleString();
+  if (closedEl) closedEl.textContent = closed.toLocaleString();
+
   const pill = document.getElementById('trend-pill');
-  if (data.trend) {
-    const delta = data.trend.delta;
-    pill.style.display = 'inline-flex';
-    pill.className = 'trend-pill ' + (delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat');
-    pill.textContent = `${delta > 0 ? '▲' : delta < 0 ? '▼' : '▬'} ${delta > 0 ? '+' : ''}${delta} vs last month`;
-  } else {
-    pill.style.display = 'none';
+  if (pill) {
+    if (data.trend) {
+      const delta = data.trend.delta;
+      pill.style.display = 'inline-flex';
+      pill.className = 'trend-pill ' + (delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat');
+      pill.textContent = `${delta > 0 ? '▲' : delta < 0 ? '▼' : '▬'} ${delta > 0 ? '+' : ''}${delta} vs last month`;
+    } else {
+      pill.style.display = 'none';
+    }
   }
 
-  // Monthly volume bar chart
-  svgBarChart(
-    'chart-monthly',
-    data.monthly_volume.map(m => m.month.slice(-2)), // works for both "25-01" (baseline) and "2025-01" (live API)
-    data.monthly_volume.map(m => m.count),
-    _currentSource === 'live' ? '#3F8489' : '#3F8489'
-  );
+  if (monthly.length) {
+    svgBarChart(
+      'chart-monthly',
+      monthly.map(m => String(m.month).slice(-2)),
+      monthly.map(m => m.count),
+      '#3F8489'
+    );
+  }
 
-  // Category donut
-  const catLabels  = Object.keys(data.by_category);
-  svgDonutChart('chart-category', catLabels.map((l, i) => ({
-    label: l, value: data.by_category[l], color: CATEGORY_COLORS[i % CATEGORY_COLORS.length]
-  })));
+  const catLabels = Object.keys(byCategory);
+  if (catLabels.length) {
+    svgDonutChart('chart-category', catLabels.map((l, i) => ({
+      label: l, value: byCategory[l], color: CATEGORY_COLORS[i % CATEGORY_COLORS.length]
+    })));
+  }
 
-  // Priority horizontal bar
   const priOrder = ['Low','Medium','High'];
   svgHBarChart(
     'chart-priority',
     priOrder,
-    priOrder.map(p => data.by_priority[p] || 0),
+    priOrder.map(p => byPriority[p] || 0),
     priOrder.map(p => PRIORITY_COLORS[p])
   );
 
-  // Status donut
-  const statLabels = Object.keys(data.by_status);
-  svgDonutChart('chart-status', statLabels.map(l => ({
-    label: l, value: data.by_status[l], color: STATUS_COLORS[l] || '#8695A4'
-  })));
+  const statLabels = Object.keys(byStatus);
+  if (statLabels.length) {
+    svgDonutChart('chart-status', statLabels.map(l => ({
+      label: l, value: byStatus[l], color: STATUS_COLORS[l] || '#8695A4'
+    })));
+  }
 }
 
 // ─── Source pill UI ──────────────────────────────────────────────────────────
@@ -404,15 +415,10 @@ async function fetchAndRenderLive() {
 
 // ─── loadAnalytics: fetch live data, cache it, render baseline on first load ─
 async function loadAnalytics() {
-  // Always render baseline immediately so charts are never blank
-  applyAnalytics(BASELINE);
-  setSourcePill('baseline');
-
-  // Fetch live in background; cache it so the toggle is instant
+  await fetchAndRenderBaseline();
   try {
     const data = await adminFetch('/admin/analytics');
     _liveData = data;
-    // If user already toggled to live before fetch finished, apply now
     if (_currentSource === 'live') {
       applyAnalytics(data);
       setSourcePill('live', data.total);
