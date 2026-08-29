@@ -619,26 +619,31 @@ function _renderViewBody(c) {
 async function openViewModal(ticketNo) {
   document.getElementById('view-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
-  // Show a loading placeholder while we fetch fresh data
   document.getElementById('view-body').innerHTML = '<p style="color:var(--ink-faint);padding:1rem 0;">Loading…</p>';
+
+  // Baseline rows live only in the CSV cache. Live lookup uses the same
+  // ticket numbers as old Comcast rows, so never fetch /admin/complaints
+  // while the CFPB toggle is on — that is what showed Comcast text
+  // or "Complaint not found".
+  const cached = lastPageData.items.find(i => Number(i.ticket_no) === Number(ticketNo));
+  if (_currentSource === 'baseline') {
+    if (cached) _renderViewBody(cached);
+    else document.getElementById('view-body').innerHTML = '<p style="color:var(--ink-faint);">Complaint not found.</p>';
+    return;
+  }
+
   try {
-    // Fetch all complaints for the current page and find this ticket,
-    // using the same filters that are active so the lookup is fast.
     const params = new URLSearchParams({ page: currentPage, page_size: PAGE_SIZE });
     const data = await adminFetch(`/admin/complaints?${params}`);
-    const c = data.items.find(i => i.ticket_no === ticketNo);
+    const c = data.items.find(i => Number(i.ticket_no) === Number(ticketNo)) || cached;
     if (c) {
-      // Update the local cache too so subsequent calls without a page
-      // refresh are also fresh
-      const idx = lastPageData.items.findIndex(i => i.ticket_no === ticketNo);
+      const idx = lastPageData.items.findIndex(i => Number(i.ticket_no) === Number(ticketNo));
       if (idx !== -1) lastPageData.items[idx] = c;
       _renderViewBody(c);
     } else {
       document.getElementById('view-body').innerHTML = '<p style="color:var(--ink-faint);">Complaint not found.</p>';
     }
   } catch (e) {
-    // Fallback to cached data so the modal is never completely empty
-    const cached = lastPageData.items.find(i => i.ticket_no === ticketNo);
     if (cached) _renderViewBody(cached);
     else document.getElementById('view-body').innerHTML = '<p style="color:var(--danger);">Could not load complaint details.</p>';
   }
@@ -726,7 +731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (freshData) {
         _liveData = freshData;
         if (_currentSource === 'live') applyAnalytics(freshData);
-        else applyAnalytics(BASELINE); // keep baseline display but cache live
+        else if (_baselineData) applyAnalytics(_baselineData);
       }
     } catch (err) {
       adminShowToast(err.message || 'Could not add complaint.');
