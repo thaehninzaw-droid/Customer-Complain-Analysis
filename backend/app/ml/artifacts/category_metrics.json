@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-08-29T09:37:40.907965+00:00",
+  "trained_at": "2026-08-29T16:23:17.625199+00:00",
   "dataset_path": "C:\\Users\\abc\\Customer-Complain-Analysis\\backend\\data\\banking_complaints.csv",
   "dataset_is_banking": true,
   "n_rows_total": 12000,

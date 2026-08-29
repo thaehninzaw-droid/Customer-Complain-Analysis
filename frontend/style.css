@@ -1662,15 +1662,7 @@ footer {
 .filter-clear:hover { color: var(--ink); }
 
 /* ---- Inline status/priority edit selects inside the admin table ---- */
-.inline-select {
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  padding: 4px 8px;
-  border-radius: 100px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  cursor: pointer;
-}
+/* Real rule lives later; this first copy used to fight it. */
 
 /* Baseline (read-only) table rows — historical CSV data, not editable */
 .baseline-row td { opacity: 0.9; }
@@ -1905,22 +1897,38 @@ footer {
   border-left-color: var(--teal);
 }
 
-/* Inline selects — match pill height; must show full Low/Medium/High */
+/* Inline selects: hide the OS arrow (Windows draws a second chevron on
+   border-radius:100px pills) and draw one caret ourselves. */
 .inline-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  padding: 4px 22px 4px 8px;
-  border-radius: 100px;
+  line-height: 1.2;
+  padding: 6px 26px 6px 10px;
+  border-radius: 8px;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%235a6a75' d='M2.4 4.2L6 7.8l3.6-3.6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
   cursor: pointer;
-  width: auto;
-  min-width: 104px;
-  max-width: none;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  color: var(--ink);
 }
-#admin-table td:nth-child(3) .inline-select { min-width: 104px; } /* Priority */
-#admin-table td:nth-child(8) .inline-select { min-width: 124px; } /* Status */
+.inline-select:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+#admin-table td:nth-child(2),
+#admin-table td:nth-child(3),
+#admin-table td:nth-child(8) {
+  overflow: hidden;
+}
 
 /* Priority badges in admin table */
 .inline-label.priority-high   { background: #FEF2F2; color: #B91C1C; border-color: #FCA5A5; }

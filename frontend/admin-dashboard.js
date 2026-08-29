@@ -332,7 +332,26 @@ function switchDataSource(source) {
   loadTable();
 }
 
-// ─── ML status (unchanged from original) ────────────────────────────────────
+// ─── ML status ──────────────────────────────────────────────────────────────
+// Banking retrain renamed the category accuracy key from
+// accuracy_vs_keyword_labels -> accuracy_vs_test_labels. Read whichever
+// numeric field exists so the card cannot render "NaN%".
+function _accuracyFromMetrics(metrics) {
+  if (!metrics) return null;
+  const keys = [
+    'accuracy_vs_test_labels',
+    'accuracy_vs_keyword_labels',
+    'accuracy_vs_baseline_labels',
+    'accuracy',
+  ];
+  for (const k of keys) {
+    const v = Number(metrics[k]);
+    if (Number.isFinite(v)) return v;
+  }
+  const reportAcc = Number(metrics.classification_report && metrics.classification_report.accuracy);
+  return Number.isFinite(reportAcc) ? reportAcc : null;
+}
+
 async function loadMlStatus() {
   try {
     const data = await adminFetch('/admin/ml-status');
@@ -340,14 +359,19 @@ async function loadMlStatus() {
     const pri = data.priority_model;
 
     document.getElementById('dot-category').classList.add(cat.available ? 'on' : 'off');
-    document.getElementById('metric-category').textContent = cat.available && cat.metrics
-      ? `Logistic Regression · ${(cat.metrics.accuracy_vs_keyword_labels * 100).toFixed(1)}% test accuracy`
-      : 'Using keyword baseline (no trained model yet)';
+    const catAcc = _accuracyFromMetrics(cat && cat.metrics);
+    document.getElementById('metric-category').textContent =
+      cat.available && catAcc != null
+        ? `Logistic Regression · ${(catAcc * 100).toFixed(1)}% test accuracy`
+        : (cat.available ? 'Logistic Regression · trained (accuracy not in metrics file)' : 'Using keyword baseline (no trained model yet)');
 
     document.getElementById('dot-priority').classList.add(pri.available ? 'on' : 'off');
-    document.getElementById('metric-priority').textContent = pri.available && pri.metrics
-      ? `${pri.metrics.model.split('(')[0]} · ${(pri.metrics.accuracy_vs_baseline_labels * 100).toFixed(1)}% test accuracy`
-      : 'Using rule-based baseline (no trained model yet)';
+    const priAcc = _accuracyFromMetrics(pri && pri.metrics);
+    const priName = (pri.metrics && pri.metrics.model) ? pri.metrics.model.split('(')[0] : 'Priority model';
+    document.getElementById('metric-priority').textContent =
+      pri.available && priAcc != null
+        ? `${priName} · ${(priAcc * 100).toFixed(1)}% test accuracy`
+        : (pri.available ? `${priName} · trained (accuracy not in metrics file)` : 'Using rule-based baseline (no trained model yet)');
   } catch (e) {
     console.warn('Could not load ML status', e);
   }
