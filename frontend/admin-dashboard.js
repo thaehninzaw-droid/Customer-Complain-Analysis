@@ -11,7 +11,7 @@ const CATEGORY_COLORS = ['#3F8489','#FFC94A','#D64545','#8695A4','#2C5F63','#a78
 const STATUS_COLORS   = { 'Pending':'#FFC94A','In Progress':'#3F8489','Resolved':'#2C5F63','Closed':'#8695A4' };
 const PRIORITY_COLORS = { 'Low':'#2C5F63','Medium':'#FFC94A','High':'#D64545' };
 
-// ─── Comcast baseline data (2,224 complaints — 2025 dataset) ────────────────
+// ─── CFPB Banking baseline data (12,000 complaints) ────────────────────────
 const BASELINE = {
   total: 2224,
   open: 847,
@@ -24,7 +24,7 @@ const BASELINE = {
     {month:'25-10',count:208},{month:'25-11',count:148},{month:'25-12',count:113},
   ],
   by_category: {
-    'Billing':612,'Financial':248,'Technical':498,'Service':387,'Others':479,
+    'Cards':612,'Accounts':387,'Loans':498,'Collections & Credit reporting':248,'Other banking':479,
   },
   by_priority: { 'Low':704,'Medium':889,'High':631 },
   by_status:   { 'Pending':312,'In Progress':535,'Resolved':1021,'Closed':356 },
@@ -296,7 +296,7 @@ function setSourcePill(source, liveTotal) {
   if (!pill) return;
   if (source === 'baseline') {
     pill.className = 'ds-source-pill baseline';
-    pill.textContent = 'Comcast Baseline · 2,224 complaints';
+    pill.textContent = 'CFPB Banking · 12,000 complaints';
   } else {
     pill.className = 'ds-source-pill live';
     pill.textContent = `Live Data · ${(liveTotal||0).toLocaleString()} complaints`;
@@ -328,7 +328,7 @@ function switchDataSource(source) {
   // Always reload the complaints table when the source changes
   currentPage = 1;
   const lbl = document.getElementById('table-source-label');
-  if (lbl) lbl.textContent = source === 'baseline' ? 'comcast dataset · read-only' : 'live database records';
+  if (lbl) lbl.textContent = source === 'baseline' ? 'banking dataset · read-only' : 'live database records';
   loadTable();
 }
 
@@ -398,7 +398,7 @@ async function loadCategoryOptions() {
   try {
     categories = await adminFetch('/categories');
   } catch (e) {
-    categories = ['Billing','Financial','Technical','Service','Others'];
+    categories = ['Cards','Accounts','Loans','Collections & Credit reporting','Other banking'];
   }
   const filterSel = document.getElementById('filter-category');
   const manualSel = document.getElementById('m-category');
@@ -428,7 +428,7 @@ function buildQueryString() {
 }
 
 async function loadTable() {
-  // Baseline mode: serve the Comcast CSV data from the backend
+  // Baseline mode: serve the banking CSV data from the backend
   // (pre-classified by Algorithms 1+2, cached after first request).
   // Live mode: serve real database records as before.
   const endpoint = _currentSource === 'baseline'
@@ -469,7 +469,7 @@ function renderTable(items, readOnly = false) {
     const categoryCell = readOnly
       ? `<span class="inline-label">${escapeHtml(c.category)}</span>`
       : `<select class="inline-select" data-field="category" data-ticket="${c.ticket_no}">
-          ${['Billing','Financial','Technical','Service','Others'].map(cat =>
+          ${['Cards','Accounts','Loans','Collections & Credit reporting','Other banking'].map(cat =>
             `<option value="${cat}" ${cat===c.category?'selected':''}>${cat}</option>`).join('')}
         </select>`;
 

@@ -53,6 +53,14 @@ NEGATIVE_WORDS = {
     "difficult": -1, "hard": -1, "inconvenient": -1, "concerned": -1,
     "unfortunately": -1, "unfortunate": -1, "not working": -1,
     "down": -1, "disconnect": -1, "disconnected": -1, "disconnecting": -1,
+    # Banking-specific negative words (Decision 34)
+    "unauthorized": -3, "theft": -3, "stolen": -3, "garnished": -3,
+    "garnishment": -3, "foreclosed": -3, "repossessed": -3,
+    "deceptive": -3, "predatory": -3, "harassing": -3, "harassment": -3,
+    "threatening": -2, "threat": -2, "inaccurate": -2, "incorrect": -2,
+    "wrongful": -2, "misleading": -2, "overcharged": -2,
+    "excessive": -2, "hidden fee": -2, "hidden fees": -2,
+    "never received": -2, "not received": -2, "denied": -2,
 }
 
 POSITIVE_WORDS = {
@@ -71,6 +79,8 @@ POSITIVE_WORDS = {
 # Words/phrases that signal time-pressure or escalation, independent of
 # sentiment polarity - these push priority UP even when phrased calmly
 # ("this has been unresolved for three weeks").
+# Decision 34: added banking-specific urgency signals (overdraft, foreclosure,
+# unauthorized charge, collections call, etc.) alongside the original set.
 URGENCY_TERMS = {
     "immediately": 3, "urgent": 3, "urgently": 3, "asap": 3, "emergency": 3,
     "right now": 3, "escalate": 2, "escalation": 2, "supervisor": 2,
@@ -78,12 +88,21 @@ URGENCY_TERMS = {
     "no one": 2, "nobody": 2, "third time": 3, "multiple times": 2,
     "repeatedly": 2, "for weeks": 3, "for days": 2, "for months": 3,
     "no response": 2, "no reply": 2, "unresponsive": 2, "unresolved": 2,
-    "keeps happening": 2, "every time": 2, "third technician": 3,
+    "keeps happening": 2, "every time": 2,
     "cannot work": 2, "can't work": 2, "losing money": 3, "lost money": 2,
     "deadline": 2, "today": 1, "hours": 1, "on hold": 1, "on hold for": 2,
     "cannot wait any longer": 3, "can't wait any longer": 3,
     "can not wait": 2, "won't wait": 2, "keep waiting": 2,
     "still waiting": 2, "long hold": 2,
+    # Banking-specific urgency signals
+    "overdraft": 3, "foreclosure": 3, "repo": 2, "repossession": 3,
+    "unauthorized charge": 3, "unauthorized transaction": 3,
+    "identity theft": 3, "fraud": 3, "fraudulent": 3,
+    "collections call": 2, "collections notice": 2, "wage garnishment": 3,
+    "garnished": 3, "lawsuit": 3, "judgment": 3, "legal action": 3,
+    "account closed": 2, "account frozen": 3, "account blocked": 3,
+    "funds held": 2, "hold on funds": 2, "cannot access": 2,
+    "eviction": 3, "three times": 3, "twice": 2, "second time": 2,
 }
 
 NEGATION_WORDS = {

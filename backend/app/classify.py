@@ -17,32 +17,51 @@ just the keyword baseline below. It's now a small dispatcher:
       idea as app/db.py's Mongo/in-memory switch.
 
   keyword_classify(text) -> category
-      The original keyword-matching baseline. Still used two ways:
+      The keyword-matching baseline. Used two ways:
       (1) as the safety-net fallback above, and (2) as the label
-      source app/ml/train_classifier.py bootstraps its training labels
-      from (a documented "distant supervision" technique - see
-      docs/ALGORITHMS.md - since the Comcast dataset itself has no
-      category column to train on directly).
+      source when the CSV has no 'category' column (distant supervision
+      - see docs/ALGORITHMS.md). The banking_complaints.csv produced by
+      clean_banking_dataset.py already has a 'category' column mapped
+      from CFPB Product, so train_classifier.py uses those real labels
+      directly and only falls back to this function if the column is
+      absent.
 
 Nothing outside this file needs to know which path is running - every
 caller only ever uses classify_complaint(text) -> category. That
 separation is the Strategy Pattern: "what gets decided" (a category)
 is decoupled from "how it gets decided" (keywords vs a trained model).
+
+Decision 34: keyword map updated from telecom to banking vocabulary.
 """
 from .categories import CATEGORIES
 
 CATEGORY_KEYWORDS = {
-    "Billing": ["bill", "billing", "charge", "charged", "overcharge", "invoice", "payment"],
-    "Financial": ["refund", "fee", "fees", "deposit", "financial", "credit", "money back"],
-    "Technical": [
-        "internet", "wifi", "wi-fi", "connection", "disconnect", "outage", "down",
-        "slow", "speed", "modem", "router", "signal", "technician", "equipment",
-        "install", "installation",
+    "Cards": [
+        "credit card", "debit card", "prepaid card", "card", "visa", "mastercard",
+        "amex", "american express", "discover", "chargeback", "dispute charge",
+        "unauthorized charge", "card number", "pin", "atm card",
     ],
-    "Service": ["rude", "service", "representative", "agent", "hold", "wait", "response", "support", "staff"],
+    "Accounts": [
+        "checking account", "savings account", "bank account", "direct deposit",
+        "overdraft", "overdraft fee", "account balance", "wire transfer",
+        "money transfer", "venmo", "zelle", "paypal", "withdrawal",
+        "deposit", "account closed", "frozen account", "account hold",
+    ],
+    "Loans": [
+        "mortgage", "loan", "student loan", "auto loan", "car loan",
+        "personal loan", "payday loan", "refinance", "foreclosure",
+        "monthly payment", "interest rate", "principal", "forbearance",
+        "loan modification", "lender", "servicer", "title loan",
+    ],
+    "Collections & Credit reporting": [
+        "credit report", "credit score", "collection", "debt", "collections",
+        "collector", "credit bureau", "equifax", "experian", "transunion",
+        "derogatory", "charge off", "charged off", "late payment",
+        "debt collection", "credit inquiry", "dispute", "inaccurate",
+    ],
 }
 
-DEFAULT_CATEGORY = "Others"
+DEFAULT_CATEGORY = "Other banking"
 
 # Guardrail: catches the exact kind of drift we already found once
 # (three different category lists across the codebase) the moment
@@ -52,10 +71,13 @@ assert set(CATEGORY_KEYWORDS) <= set(CATEGORIES), "CATEGORY_KEYWORDS has a categ
 
 
 def keyword_classify(text: str) -> str:
-    """Returns the best-matching category for a complaint's text using
-    plain keyword counting. Falls back to DEFAULT_CATEGORY ("Others")
-    if nothing matches - that's also a real option in the dropdown, so
-    this lines up naturally.
+    """Returns the best-matching banking category for a complaint's text
+    using plain keyword / phrase counting. Falls back to DEFAULT_CATEGORY
+    ("Other banking") if nothing matches.
+
+    Multi-word phrases (e.g. "credit card", "credit report") are checked
+    with substring search on the lowercased text - same O(len(text)) cost
+    as single-word checks, and far more precise than splitting on tokens.
     """
     text_lower = text.lower()
     scores = {

@@ -1,74 +1,147 @@
 # Loopline
 
-Customer complaint classification system - undergraduate thesis.
-Customers file complaints and track their status; two ML algorithms
-auto-categorize and auto-prioritize every complaint; an admin
-dashboard gives real-time filtering, analytics, and an AI chatbot
-grounded in support SOPs.
+Banking complaint classification system — undergraduate thesis project.
+
+Customers file banking complaints and track their status. Two ML
+algorithms auto-categorize every complaint into one of five banking
+categories and predict its urgency (Low / Medium / High). An admin
+dashboard gives real-time filtering, analytics, and a chatbot grounded
+in banking SOP documents.
 
 ## Layout
 
 ```
 loopline/
-├── backend/     FastAPI + MongoDB (or zero-setup in-memory fallback)
-│                see backend/README.md to run it
-├── frontend/    Plain HTML/CSS/JS - customer portal + admin portal,
-│                both wired to the real backend (no localStorage left)
-├── docs/        Full documentation set - see the map below
-└── ROADMAP.md    What's done, what's next, what's a known gap
+├── backend/              FastAPI + MongoDB (or zero-setup in-memory fallback)
+│   ├── app/              Application source
+│   │   ├── ml/           Algorithm 1 (classifier) + Algorithm 2 (priority)
+│   │   └── rag/          BM25 retrieval + Gemini chatbot pipeline
+│   └── data/
+│       ├── raw/          Raw CFPB dataset (untouched, not in git)
+│       ├── banking_complaints.csv   Clean training data (12,000 rows)
+│       ├── clean_banking_dataset.py Reproducible cleaning script
+│       ├── EDA.md                   Full EDA report
+│       └── knowledge_base/          Five banking SOP documents (chatbot source)
+├── frontend/             Plain HTML/CSS/JS — customer portal + admin portal
+└── docs/                 Full documentation set
 ```
 
 ## Start here
 
-- **Brand new to this codebase, or to backend dev in general?** Read
-  `docs/GETTING_STARTED.md` - a step-by-step setup guide that assumes
-  nothing, written for anyone picking this up for the first time.
-- **New to the project, or picking this back up after a break?** Read
-  `ROADMAP.md` first - status at a glance, then `docs/DECISIONS.md`
-  for the full "why" behind every major choice.
-- **Running the backend locally?** `backend/README.md` (or
-  `docs/GETTING_STARTED.md` if you want the fully-explained version).
-- **Understanding the two ML algorithms** (category classification +
-  priority prediction - what the thesis' "algorithm" requirement is
-  built on)? `docs/ALGORITHMS.md`.
-- **Setting up the RAG chatbot** (Gemini + Qdrant)? `docs/RAG_CHATBOT.md`.
-- **Deploying for real** (Render/Atlas/Qdrant Cloud, all free-tier)?
-  `docs/DEPLOYMENT.md`.
-- **Wondering what's actually been tested vs. just written**?
-  `docs/TESTING.md` - read this before assuming anything works
-  end-to-end without checking.
-- **Setting up shared version control for the team?** `docs/GIT_SETUP.md`.
+- **New to this codebase?** → `docs/GETTING_STARTED.md` — step-by-step
+  setup including dataset download, cleaning, and model training.
+- **Picking this back up after a break?** → `ROADMAP.md` for status at
+  a glance, then `docs/DECISIONS.md` for the "why" behind every major choice.
+- **Understanding the two ML algorithms?** → `docs/ALGORITHMS.md`
+- **Setting up the RAG chatbot (Gemini + Qdrant)?** → `docs/RAG_CHATBOT.md`
+- **Deploying to production (Render / Atlas / Qdrant Cloud)?** → `docs/DEPLOYMENT.md`
+- **What's tested vs. just written?** → `docs/TESTING.md`
 
-## Current status
+## What the system does
 
-Both algorithms are built, trained, and now running against the real
-Kaggle dataset (2224 rows - see `docs/ALGORITHMS.md` for real accuracy
-numbers and a few real bugs that dataset surfaced and fixed along the
-way). The full customer + admin frontend is wired to a real,
-session-token-authenticated backend (see `docs/FRONTEND_INTEGRATION.md`),
-and the RAG chatbot is implemented against Gemini + Qdrant (see
-`docs/RAG_CHATBOT.md`). CI (`.github/workflows/tests.yml`) runs the
-full test suite on every push once this is on GitHub - the first
-environment with both internet access and the full dependency set
-(`fastapi`/`pydantic`/`pytest`/`xgboost`) installed at once, since the
-sandbox this was built in had neither (see `docs/TESTING.md` for
-exactly what that means and what to check first). Full detail in
-`ROADMAP.md`.
+### Customer portal
+- Sign up / log in with a session-token authenticated account
+- File a banking complaint — the form collects **complaint text, date, time, and city/region only**. There is no category picker and no "AI detected category" label shown to the customer.
+- View complaint history: Ticket # / Complaint / Date / Priority / Status
+
+### Admin portal
+- View all complaints with full banking category labels (Cards, Accounts, Loans, Collections & Credit reporting, Other banking)
+- Filter by category, priority, status, date range, and free-text search
+- Edit complaint status and category inline
+- Analytics dashboard: category distribution, priority breakdown, monthly volume
+- Chatbot grounded in five banking SOP documents (not trained on complaint data)
+
+### Two ML algorithms
+
+**Algorithm 1 — Category classification**
+- TF-IDF (unigrams + bigrams, 4,000 features) + Logistic Regression
+- Trained on 12,000 banking complaints from the CFPB Consumer Complaint Database
+- Labels come from the CFPB `Product` field (authoritative mapping, not distant supervision)
+- Accuracy: **86.5%** on held-out test split against CFPB-mapped labels
+- Keyword-baseline fallback when no trained artifact exists
+
+**Algorithm 2 — Priority prediction**
+- Sentiment + urgency scoring baseline → XGBoost (or HistGradientBoostingClassifier)
+- Trained on same 12,000 rows; priority labels generated by distant supervision from the rule-based baseline (CFPB has no priority column)
+- Business rule layered on top: same user, same day, similar complaint → **forced High**
+- Banking-specific urgency terms: overdraft, foreclosure, unauthorized charge, identity theft, fraud, garnishment
+
+## Dataset
+
+**CFPB Consumer Complaint Database** (Kaggle: `sebastienverpile/consumercomplaintsdata`)
+
+| Stage | Rows | Location |
+|---|---|---|
+| Raw | 903,983 | `backend/data/raw/consumer_complaints.csv` (not in git) |
+| After cleaning | 12,000 | `backend/data/banking_complaints.csv` |
+
+Cleaning steps: drop rows with missing/short narratives (<200 chars),
+normalise CFPB redaction tokens, deduplicate, map CFPB `Product` to 5
+banking categories, undersample to 3,000 rows per class. See
+`backend/data/EDA.md` for the full report and
+`backend/data/clean_banking_dataset.py` for the reproducible script.
+
+**Category mapping:**
+
+| Category | CFPB Products |
+|---|---|
+| Cards | Credit card · Prepaid card · Credit card or prepaid card |
+| Accounts | Checking or savings account · Bank account or service · Money transfers |
+| Loans | Mortgage · Student loan · Auto loan · Payday loan · Consumer Loan |
+| Collections & Credit reporting | Debt collection · Credit reporting (all variants) |
+| Other banking | Default for anything unmapped |
+
+## Chatbot
+
+The admin chatbot is grounded in five banking SOP documents in
+`backend/data/knowledge_base/`. It uses BM25 retrieval (no API key
+needed) and optionally Gemini for answer generation (requires
+`GEMINI_API_KEY`). **The chatbot does not train on complaint data.**
+
+## Quick start
+
+```bash
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env
+
+# Prepare data (download raw CSV from Kaggle first — see GETTING_STARTED.md Step 5)
+python -m data.clean_banking_dataset
+python -m app.ml.train_classifier
+python -m app.ml.train_priority
+
+# Start server
+uvicorn app.main:app --reload
+```
+
+Then open `frontend/index.html` in your browser. Admin credentials are
+printed in the terminal on first startup.
+
+Full setup guide: `docs/GETTING_STARTED.md`
+
+## Tests
+
+```bash
+cd backend && pytest
+# Expect: 164 passed, 0 failed
+```
 
 ## Documentation map
 
-| Doc | What's in it |
+| Doc | Contents |
 |---|---|
-| `docs/GETTING_STARTED.md` | Step-by-step local setup for anyone new - assumes nothing |
-| `ROADMAP.md` | Status at a glance, next steps, known gaps |
-| `docs/ARCHITECTURE.md` | System overview, why it's shaped this way |
-| `docs/ALGORITHMS.md` | Both ML algorithms - methodology, bugs found & fixed, how to retrain |
-| `docs/RAG_CHATBOT.md` | Gemini + Qdrant setup, architecture, API shapes used |
-| `docs/VISUALIZATIONS.md` | Every chart and graph in the admin dashboard — what it shows, data source, and how to get data appearing |
-| `docs/ADMIN_AUTH.md` | Roles, security model, how admin accounts get created |
-| `docs/API_REFERENCE.md` | Every endpoint, request/response shapes |
-| `docs/TESTING.md` | What's verified vs. reviewed-but-not-run, and why |
+| `docs/GETTING_STARTED.md` | Full local setup — dataset, cleaning, training, running |
+| `docs/ALGORITHMS.md` | Both algorithms — methodology, real accuracy numbers, documented bugs |
+| `docs/DECISIONS.md` | Full ADR log including Decision 34 (banking pivot) |
+| `docs/ARCHITECTURE.md` | System overview and design rationale |
+| `docs/API_REFERENCE.md` | Every endpoint with request/response shapes |
+| `docs/RAG_CHATBOT.md` | Gemini + Qdrant setup and architecture |
+| `docs/TESTING.md` | What is verified vs. reviewed-but-not-run |
 | `docs/DEPLOYMENT.md` | Free-tier deployment walkthrough |
-| `docs/FRONTEND_INTEGRATION.md` | What changed on the frontend and why |
-| `docs/DECISIONS.md` | The full ADR log - every major decision, explained |
-| `docs/GIT_SETUP.md` | Getting the team onto one shared GitHub repo |
+| `docs/ADMIN_AUTH.md` | Roles, security model, admin account creation |
+| `docs/FRONTEND_INTEGRATION.md` | Frontend changes and rationale |
+| `docs/VISUALIZATIONS.md` | Every dashboard chart — data source and how to populate |
+| `docs/GIT_SETUP.md` | Team version-control workflow |
+| `ROADMAP.md` | Status, next steps, known gaps |
+| `backend/data/EDA.md` | Full dataset EDA report |

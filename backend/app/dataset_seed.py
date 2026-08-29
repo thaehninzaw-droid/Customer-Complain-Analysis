@@ -1,21 +1,18 @@
 """
-Seeds the complaints collection from the Comcast dataset CSV on first
+Seeds the complaints collection from the banking_complaints.csv on first
 startup, but ONLY when running against the in-memory DB fallback (no
 MONGODB_URI configured). With a real MongoDB URI the data was already
 loaded via `python -m data.load_dataset` as a one-off step, so this
 module does nothing in that case.
 
-This is what makes the admin dashboard show real analytics (charts,
-counts, category/priority/status breakdowns) immediately after cloning
-and running `uvicorn app.main:app` for the first time, without any
-separate data-loading step. Without it, the dashboard is empty and the
-charts have nothing to render - which was the exact problem on first
-run with a fresh in-memory DB (see docs/DECISIONS.md #26).
+Decision 34: swapped from comcast_complaints.csv to banking_complaints.csv.
+The clean file was produced by backend/data/clean_banking_dataset.py and
+contains CFPB-mapped banking complaints with long narratives.
 
 Only runs when:
   - The complaints collection is empty (idempotent - never duplicates)
   - MONGODB_URI is NOT set (in-memory DB mode)
-  - The CSV file exists at backend/data/comcast_complaints.csv
+  - The CSV file exists at backend/data/banking_complaints.csv
 
 Does NOT run when MONGODB_URI is set - that environment is assumed to
 already have data loaded (or will have it loaded manually).
@@ -24,7 +21,7 @@ import csv
 import os
 from pathlib import Path
 
-CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "comcast_complaints.csv"
+CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "banking_complaints.csv"
 
 STATUS_MAP = {
     "Solved": "Resolved",
@@ -41,22 +38,22 @@ def _normalize_status(raw: str) -> str:
 
 
 def _parse_date(raw: str) -> str:
-    """Accept both ISO 'YYYY-MM-DD' and old 'DD-Mon-YY' format."""
+    """Accept ISO 'YYYY-MM-DD' (banking_complaints.csv always uses this)."""
     raw = (raw or "").strip()
     if not raw:
         return ""
     if len(raw) >= 10 and raw[4] == "-":
         return raw[:10]
-    # Old format e.g. '22-Apr-15'
+    # Fallback for any other format
     try:
         from datetime import datetime
-        return datetime.strptime(raw, "%d-%b-%y").strftime("%Y-%m-%d")
+        return datetime.strptime(raw, "%m/%d/%Y").strftime("%Y-%m-%d")
     except ValueError:
         return raw
 
 
 def ensure_dataset_seeded():
-    """Called at startup. Seeds complaints from the CSV if the
+    """Called at startup. Seeds complaints from the banking CSV if the
     in-memory collection is empty. Safe to call multiple times."""
     if os.getenv("MONGODB_URI"):
         return  # Real MongoDB - don't auto-seed; data loaded manually
@@ -73,27 +70,29 @@ def ensure_dataset_seeded():
     if list(collection.find()):
         return  # Already has data
 
-    print(f"[dataset_seed] Seeding complaints from {CSV_PATH.name}...")
+    print(f"[dataset_seed] Seeding complaints from {CSV_PATH.name} (banking pivot)...")
     docs = []
-    with open(CSV_PATH, newline="", encoding="utf-8-sig") as f:
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
-            text = (row.get("Customer Complaint") or "").strip()
+            text = (row.get("complaint") or "").strip()
             if not text:
                 continue
-            date_raw = row.get("Date_month_year") or row.get("Date") or ""
+            date_raw = row.get("date_month_year") or ""
+            # banking_complaints.csv already has 'category' from CFPB mapping
+            category = (row.get("category") or "").strip() or classify_complaint(text)
             docs.append({
                 "ticket_no": 100001 + i,
                 "user_id": 0,  # 0 = historical, no linked customer account
                 "complaint": text,
                 "date_month_year": _parse_date(date_raw),
-                "time": (row.get("Time") or "00:00:00").strip(),
-                "city": (row.get("City") or "").strip(),
-                "state": (row.get("State") or "").strip(),
-                "zipcode": (row.get("Zip code") or "").strip(),
-                "received_via": (row.get("Received Via") or "Web Form").strip(),
-                "status": _normalize_status(row.get("Status") or ""),
-                "category": classify_complaint(text),
+                "time": "00:00:00",
+                "city": "",
+                "state": (row.get("state") or "").strip(),
+                "zipcode": "",
+                "received_via": (row.get("received_via") or "Web").strip(),
+                "status": _normalize_status(row.get("status") or ""),
+                "category": category,
                 "priority": "",  # filled below
             })
 
@@ -104,5 +103,5 @@ def ensure_dataset_seeded():
     for doc in docs:
         collection.insert_one(doc)
 
-    print(f"[dataset_seed] Seeded {len(docs)} complaints — "
+    print(f"[dataset_seed] Seeded {len(docs)} banking complaints — "
           f"dashboard analytics are now populated.")

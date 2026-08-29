@@ -1,40 +1,38 @@
 """
-Loads the Comcast Telecom Complaints CSV (or any CSV with a similar
-shape) into the complaints collection, running each row through the
-same classifier + priority predictor the API uses (Algorithm 1 +
-Algorithm 2) - so historical and new complaints end up tagged the
-same way.
+Loads the banking_complaints.csv (or any CSV with a similar shape)
+into the complaints collection, running each row through the same
+classifier + priority predictor the API uses (Algorithm 1 + Algorithm 2)
+- so historical and new complaints end up tagged the same way.
+
+Decision 34: primary dataset changed from comcast_complaints.csv to
+banking_complaints.csv (CFPB-mapped banking data). The loader supports
+both column schemas for backward compatibility.
 
 Usage:
-    python -m data.load_dataset path/to/comcast_complaints.csv
-    python -m data.load_dataset path/to/comcast_complaints.csv --demo-shift-dates
+    python -m data.load_dataset path/to/banking_complaints.csv
+    python -m data.load_dataset path/to/banking_complaints.csv --demo-shift-dates
 
-Expected columns (Comcast_Cleaned.csv - the active dataset as of
-docs/DECISIONS.md #25):
-    Ticket #, Customer Complaint, Date, Date_month_year, Time,
-    Received Via, City, State, Zip code, Status,
-    Filing on Behalf of Someone, Complaint_Clean
+Expected columns (banking_complaints.csv - clean CFPB banking data):
+    complaint, category, product_raw, date_month_year, state,
+    received_via, issue, company, source
 
-Only "Customer Complaint" is required - everything else is optional
-and mapped onto the app's own field names (ticket_no, date_month_year,
-etc.) where available. Complaint_Clean (pre-lowercased/stripped text
-added during cleaning) is used for ML training if present; the loader
-itself still uses "Customer Complaint" so the stored complaint text
-is the human-readable original. Historical rows get user_id = 0.
+Legacy columns also accepted (comcast_complaints.csv):
+    Customer Complaint, Date_month_year, Time, Received Via,
+    City, State, Zip code, Status
 
-DATE FORMAT: Comcast_Cleaned.csv uses ISO "YYYY-MM-DD" in
-Date_month_year (e.g. "2025-04-22"), which is exactly what this app
-stores everywhere - no conversion needed. parse_date() handles both
-ISO and the original "DD-Mon-YY" format so this loader works against
-the old raw CSV too. The "Date" column is NaN in the cleaned file -
-the loader uses "Date_month_year" as primary source.
+The 'category' column in banking_complaints.csv already contains the
+CFPB-mapped category - no re-classification needed for that field.
+Historical rows get user_id = 0.
 
-STATUS VOCABULARY: the CSV uses "Solved"/"Open" instead of this
-app's "Resolved"/"Pending" - mapped below so a single, mixed-source
-complaints collection has one consistent vocabulary.
+DATE FORMAT: banking_complaints.csv uses ISO "YYYY-MM-DD" in
+date_month_year, which is exactly what this app stores everywhere.
+parse_date() handles multiple formats for backward compatibility.
 
-The BOM at the start of the CSV header (a Kaggle/Excel export
-artifact) is handled by utf-8-sig encoding below.
+STATUS VOCABULARY: banking_complaints.csv has no 'status' column
+(CFPB data has no status). These rows default to "Pending". The
+legacy Comcast CSV uses "Solved"/"Open" - mapped as before.
+
+The BOM at the start of the CSV header is handled by utf-8-sig encoding.
 """
 
 import csv
@@ -138,20 +136,23 @@ def load_csv(path: str, demo_shift_dates: bool = False) -> int:
 
     count = 0
     for row in rows:
-        text = (row.get("Customer Complaint") or "").strip()
+        # Support banking CSV ('complaint') and legacy CSV ('Customer Complaint')
+        text = (row.get("complaint") or row.get("Customer Complaint") or "").strip()
         if not text:
             continue
 
-        category = classify_complaint(text)
+        # Use pre-mapped category from banking_complaints.csv when available;
+        # fall back to classifier for legacy CSV without a category column.
+        existing_category = (row.get("category") or "").strip()
+        category = existing_category if existing_category else classify_complaint(text)
         priority = predict_priority(text, category)
-        # Deliberately NOT normalized to match the app's "Web Form"/
-        # "Manual Entry" vocabulary - see module docstring point 2's
-        # sibling discussion in docs/ALGORITHMS.md for why real
-        # historical values ("Internet", "Customer Care Call") are
-        # kept as-is rather than silently relabeled.
-        received_via = row.get("Received Via") or "Web Form"
 
-        parsed_date = parse_date(row.get("Date", ""))
+        received_via = row.get("received_via") or row.get("Received Via") or "Web Form"
+
+        # Banking CSV has 'date_month_year'; legacy CSV has 'Date'
+        raw_date = (row.get("date_month_year") or row.get("Date_month_year") or
+                    row.get("Date") or "")
+        parsed_date = parse_date(raw_date)
         effective_date = (parsed_date or date.today()) + shift
 
         doc = {
@@ -162,12 +163,12 @@ def load_csv(path: str, demo_shift_dates: bool = False) -> int:
             "complaint": text,
             "date_month_year": effective_date.strftime("%Y-%m-%d"),
             "time": normalize_time(row.get("Time", "")),
-            "city": row.get("City") or None,
-            "state": row.get("State") or None,
-            "zipcode": row.get("Zip code") or None,
-            "status": normalize_status(row.get("Status", "")),
+            "city": row.get("city") or row.get("City") or None,
+            "state": row.get("state") or row.get("State") or None,
+            "zipcode": row.get("zipcode") or row.get("Zip code") or None,
+            "status": normalize_status(row.get("status") or row.get("Status") or ""),
             "received_via": received_via,
-            "source": "kaggle_import" if not demo_shift_dates else "kaggle_import_demo_shifted",
+            "source": row.get("source") or ("kaggle_import" if not demo_shift_dates else "kaggle_import_demo_shifted"),
         }
         collection.insert_one(doc)
         next_no += 1

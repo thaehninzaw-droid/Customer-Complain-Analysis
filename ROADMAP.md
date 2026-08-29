@@ -16,7 +16,7 @@ this file is just the *what* and *what's next*.
 | Admin AI Chatbot (RAG: BM25 retrieval + Gemini generation) | ✅ Live. Retrieval uses BM25 (pure Python, no quota). Gemini used only for answer generation. Fallback to templates if Gemini is unavailable. |
 | Hybrid retrieval (BM25 + Gemini query embeddings + RRF) | ✅ Implemented. `app/rag/hybrid_retriever.py`. Query-only embedding (no corpus quota risk). BM25 always runs; embeddings are optional and silently skipped on failure. |
 | Full FastAPI HTTP layer test pass | ✅ Confirmed - CI is green (see `docs/TESTING.md`) |
-| Real Kaggle dataset loaded | ✅ Done - `backend/data/comcast_complaints.csv`, both models retrained against it (see `docs/ALGORITHMS.md`) |
+| Real Kaggle dataset loaded | ✅ Done - `backend/data/banking_complaints.csv` (12,000 CFPB banking complaints, 3,000 per category), both models retrained. See `docs/ALGORITHMS.md` and `backend/data/EDA.md` |
 | Pushed to a real GitHub remote | ✅ Done - CI running on every push, confirmed green |
 | Deployed (Render/Atlas/Qdrant Cloud) | ❌ Not yet - credentials ready, see `docs/DEPLOYMENT.md` for the plan |
 | CI (GitHub Actions running tests on push) | ✅ Done and green - `.github/workflows/tests.yml` |
@@ -33,7 +33,7 @@ this file is just the *what* and *what's next*.
 | Junior-proposed "activities" feature (`Myactivities.zip`) | ✅ Evaluated - already exists in Loopline, more completely (real ML classification, real status workflow, real auth/data isolation vs. the prototype's plaintext-password/no-isolation/always-"Pending" version). No new feature needed. Two small hardening ideas borrowed and **implemented**: server-side complaint length/city validation, and a `GET /cities` endpoint. See `docs/DECISIONS.md` #21/#22. |
 | Junior-friendly step-by-step setup guide | ✅ Done - `docs/GETTING_STARTED.md`, assumes zero prior familiarity (not even that Python is installed). See `docs/DECISIONS.md` #21. |
 | Ticket numbers "only showing 1, 2, 3" | ✅ Investigated - not a real numbering bug (confirmed `app/tickets.py` + both complaint-creation endpoints correctly start at 100001). Root cause was a missing `min` attribute on the admin chatbot's ticket-number input. Fixed. See `docs/DECISIONS.md` #24. |
-| Which dataset trains the ML models | ✅ Clarified - `comcast_complaints.csv` (real Kaggle data), confirmed via the training scripts' own fallback order + saved metrics. `synthetic_complaints.csv` is an unused dev-only stand-in. See `docs/DECISIONS.md` #24. |
+| Which dataset trains the ML models | ✅ Clarified - `banking_complaints.csv` (12,000 clean CFPB banking complaints). See `docs/DECISIONS.md` Decision 34 and `backend/data/EDA.md`. |
 | Gemini `embedContent` 400 error | ✅ **Fixed and verified** - the `"model"` field fix resolved the issue; RAG confirmed working end-to-end on real hardware. See `docs/DECISIONS.MD` #24. |
 | RAG `knowledge_base.py` doesn't pick up `.env` when run standalone | ✅ Fixed - added `load_dotenv()` at top of `knowledge_base.py` with path search for `backend/.env`. See `docs/DECISIONS.md` #26. |
 | Qdrant "Collection doesn't exist" unhelpful error | ✅ Fixed - `vector_store.py` now catches the 404 specifically and returns an actionable message pointing to Step 11 of `docs/GETTING_STARTED.md`. |
@@ -42,7 +42,7 @@ this file is just the *what* and *what's next*.
 | `docs/VISUALIZATIONS.md` for junior team | ✅ Done - documents all 4 charts + 3 KPI cards + algorithm status chips with data sources, colors, and how to get data showing. |
 | Step 11 in GETTING_STARTED.md (RAG indexing) | ✅ Done - full step-by-step for enabling the AI chatbot with real API keys. |
 | Analytics dashboard visual polish | ✅ Done - Chart.js replaced with pure SVG (`svgBarChart`, `svgDonutChart`, `svgHBarChart`). Baseline/live toggle. No CDN dependency. See `docs/DECISIONS.md` #27. |
-| Switch to Comcast_Cleaned.csv (2025 dates, Complaint_Clean col) | ✅ Done - `backend/data/comcast_complaints.csv` replaced with the cleaned version (same 2224 rows, ISO dates, extra `Complaint_Clean` column). Both models retrained: 93.0%/100% accuracy unchanged. 103/103 tests passing. See `docs/DECISIONS.md` #25. |
+| Banking pivot (Decision 34) | ✅ Done - pivoted from Comcast telecom to CFPB banking complaints. Dataset: 12,000 rows, 5 banking categories. Category classifier: 86.5% accuracy on CFPB-mapped labels. 164/164 tests passing. See `docs/DECISIONS.md` Decision 34. |
 | RAG architecture clarified for junior team | ✅ Documented - RAG uses `data/knowledge_base/` SOP docs (Markdown or PDF), not the training datasets. The two datasets train the ML models only. See `docs/DECISIONS.md` #25 and `docs/RAG_CHATBOT.md`. |
 
 ## What's confirmed working (as of last local test)
@@ -66,7 +66,7 @@ MONGODB_URI=mongodb+srv://...your Atlas connection string...
 ```
 Then restart `uvicorn`. The admin seed and complaint-filing all work
 against the real DB — the code has been ready since Decision 7.
-Run `python -m data.load_dataset backend/data/comcast_complaints.csv`
+Run `python -m data.clean_banking_dataset` then `python -m data.load_dataset backend/data/banking_complaints.csv`
 once to populate Atlas with the full 2,224-row history.
 
 **2. Deployment** — never done. All services (Render, Atlas, Qdrant
@@ -88,7 +88,7 @@ the same already-working services." Full walkthrough in
   from `GET /cities` yet. Both are identical today so no drift, but
   worth cleaning up if touching that file anyway (see
   `docs/FRONTEND_INTEGRATION.md`'s "Cities" section).
-- Billing/Financial category overlap — still an open academic
+- Cards/Accounts category overlap (e.g. prepaid card vs account) — still an open academic
   question (see `docs/DECISIONS.md`'s "Not done yet" section).
 
 
@@ -97,7 +97,7 @@ the same already-working services." Full walkthrough in
 - ~~If there's internet access anywhere in the pipeline, confirm the
   real XGBoost path works~~ ✅ Confirmed.
 - ~~Real Gemini + Qdrant calls tested~~ ✅ Confirmed working locally.
-- Resolve the Billing/Financial category overlap (open academic
+- Resolve the Cards/Accounts boundary overlap (open academic
   question - see `docs/DECISIONS.md`'s "Not done yet" section).
 - Get the actual thesis rubric and verify every criterion is met.
 - ~~Server-side complaint validation~~ ✅ Done (`app/validation.py`).

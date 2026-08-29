@@ -31,11 +31,36 @@ from .rag import groq_client
 from .rag.pipeline import answer as rag_answer
 
 RECOMMENDATIONS = {
-    "Billing": "Recommended action: verify the charge against the account's billing history, and adjust or refund if it was an error.",
-    "Financial": "Recommended action: review the fee or refund request against policy, and process or explain the outcome to the customer.",
-    "Technical": "Recommended action: check for a known outage in the customer's area; if none, run a remote diagnostic or schedule a technician.",
-    "Service": "Recommended action: escalate to a supervisor and follow up with the customer within 24 hours.",
-    "Others": "Recommended action: route to a general support queue for manual review.",
+    "Cards": (
+        "Recommended action: verify whether the transaction was authorized. "
+        "If fraudulent, initiate a chargeback dispute, issue a replacement card, "
+        "and apply a provisional credit within 1-5 business days per Regulation Z."
+    ),
+    "Accounts": (
+        "Recommended action: check the account hold or freeze reason. "
+        "If an unauthorized ACH or wire is involved, file a dispute and apply a "
+        "provisional credit within 10 business days per EFTA. Reset credentials "
+        "and issue a new debit card if the account was compromised."
+    ),
+    "Loans": (
+        "Recommended action: pull the full payment history and compare to the loan "
+        "agreement. If a servicer error is found, issue a written correction within "
+        "7 business days (RESPA). For modification requests, acknowledge within "
+        "5 days and decide within 30 days of a complete application (Regulation X)."
+    ),
+    "Collections & Credit reporting": (
+        "Recommended action: verify the account data against internal records. "
+        "If inaccurate, submit a Metro 2 correction to the bureau within 30 days "
+        "(FCRA 623). If a collector is harassing the customer, issue a cease-contact "
+        "letter and log a potential FDCPA violation for Compliance."
+    ),
+    "Other banking": (
+        "Recommended action: identify whether the complaint involves a fee, "
+        "account opening/closure, or another service issue. Check Regulation DD "
+        "disclosure requirements for fee complaints. Escalate to a supervisor "
+        "if the customer requests it, and provide the CFPB complaint portal "
+        "address if unresolved after escalation."
+    ),
 }
 
 # Guardrail: every category must have a recommendation, and vice versa -
@@ -57,7 +82,7 @@ def get_recommendation(complaint_text: str, category: str) -> str:
             # always-available template rather than erroring the
             # request.
             pass
-    return RECOMMENDATIONS.get(category, RECOMMENDATIONS["Others"])
+    return RECOMMENDATIONS.get(category, RECOMMENDATIONS["Other banking"])
 
 
 def ask_admin_chatbot(question: str, ticket_context: str = None) -> dict:

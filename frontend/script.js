@@ -83,9 +83,9 @@ async function populateCategorySelect(selectEl, { includeAutoDetect = false } = 
   }
 }
 populateCategorySelect(document.getElementById('s-category'));
-// #f-category (activities.html) is populated in wireActivitiesPage() below,
-// with includeAutoDetect:true, since it's optional there (Algorithm 1
-// auto-classifies if left blank).
+// Note: the customer complaint form (#complaint-form in activities.html) no
+// longer has a category selector. Category is always classified server-side
+// (Algorithm 1). Only the admin dashboard exposes category controls. (Decision 34)
 
 // ---------- Toast helper ----------
 function showToast(message) {
@@ -531,13 +531,11 @@ function renderComplaintTable(filterText) {
     return;
   }
   if (empty) empty.style.display = 'none';
-  const catColorMap = {
-    'Billing': 'var(--amber-tint)', 'Financial': '#E8E4F0', 'Technical': '#E0EFEA',
-    'Service': '#FFE7E0', 'Others': '#F0ECDC'
-  };
-  const catTextMap = {
-    'Billing': 'var(--amber-dark)', 'Financial': '#5B4B8A', 'Technical': 'var(--teal-dark)',
-    'Service': '#A24C2E', 'Others': '#7A6A2A'
+  // Priority badge colours (customer view shows priority, not category — Decision 34)
+  const priorityColorMap = {
+    'High': { bg: '#FDECEA', color: '#C0392B' },
+    'Medium': { bg: '#FEF9E7', color: '#9A7D0A' },
+    'Low': { bg: '#E8F8F5', color: '#1A5276' },
   };
   rows.forEach(c => {
     const tr = document.createElement('tr');
@@ -546,19 +544,14 @@ function renderComplaintTable(filterText) {
     tr.dataset.ticket = String(c.ticket_no);
     tr.title = 'Click to view details';
     const statusClass = ['Resolved', 'Closed'].includes(c.status) ? 'resolved' : 'pending';
-    const catBg = catColorMap[c.category] || 'var(--teal-tint)';
-    const catCol = catTextMap[c.category] || 'var(--teal-dark)';
-    const catStyle = `display:inline-block;padding:4px 10px;border-radius:100px;font-family:var(--font-mono);font-size:0.72rem;background:${catBg};color:${catCol};`;
+    const priBadge = priorityColorMap[c.priority] || { bg: 'var(--teal-tint)', color: 'var(--teal-dark)' };
+    const priStyle = `display:inline-block;padding:3px 9px;border-radius:100px;font-family:var(--font-mono);font-size:0.72rem;background:${priBadge.bg};color:${priBadge.color};`;
     const safeComplaint = (c.complaint || '').replace(/"/g, '&quot;');
     tr.innerHTML = `
       <td><span class="ticket-no">#${c.ticket_no}</span></td>
-      <td><span style="${catStyle}">${c.category || ''}</span></td>
       <td><div class="complaint-text" title="${safeComplaint}">${c.complaint || ''}</div></td>
       <td style="white-space:nowrap;font-family:var(--font-mono);font-size:0.84rem;color:var(--ink-soft);">${formatDateDisplay(c.date_month_year)}</td>
-      <td style="white-space:nowrap;font-family:var(--font-mono);font-size:0.84rem;color:var(--ink-soft);">${formatTimeDisplay(c.time)}</td>
-      <td>${c.city || ''}</td>
-      <td>${c.state || ''}</td>
-      <td style="font-family:var(--font-mono);">${c.zipcode || ''}</td>
+      <td><span style="${priStyle}">${c.priority || 'Low'}</span></td>
       <td><span class="status-badge ${statusClass}">${c.status || 'Pending'}</span></td>
       <td>
         <div class="row-actions" style="display:flex;gap:6px;">
@@ -775,8 +768,7 @@ function openComplaintModal() {
   const ticketInput = document.getElementById('f-ticket');
   if (ticketInput) ticketInput.value = 'Assigned automatically on submit';
 
-  const cat = document.getElementById('f-category');
-  if (cat) cat.value = '';
+  // No f-category to reset — category field removed from customer form (Decision 34)
   const complaint = document.getElementById('f-complaint');
   if (complaint) complaint.value = '';
   const citySearch = document.getElementById('city-search');
@@ -811,7 +803,7 @@ function openComplaintModal() {
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(() => {
-    const f = document.getElementById('f-category');
+    const f = document.getElementById('f-complaint');
     if (f) f.focus();
   }, 150);
 }
@@ -829,16 +821,14 @@ function findComplaintByTicket(ticketNo) {
 }
 
 function buildViewDetailsMarkup(c) {
-  const catColorMap = {
-    'Billing': 'var(--amber-tint)', 'Financial': '#E8E4F0', 'Technical': '#E0EFEA',
-    'Service': '#FFE7E0', 'Others': '#F0ECDC'
+  // Category is NOT shown to the customer (Decision 34). Admin sees it in admin-dashboard.
+  const priorityColorMap = {
+    'High': { bg: '#FDECEA', color: '#C0392B' },
+    'Medium': { bg: '#FEF9E7', color: '#9A7D0A' },
+    'Low': { bg: '#E8F8F5', color: '#1A5276' },
   };
-  const catTextMap = {
-    'Billing': 'var(--amber-dark)', 'Financial': '#5B4B8A', 'Technical': 'var(--teal-dark)',
-    'Service': '#A24C2E', 'Others': '#7A6A2A'
-  };
-  const catBg = catColorMap[c.category] || 'var(--teal-tint)';
-  const catCol = catTextMap[c.category] || 'var(--teal-dark)';
+  const priBadge = priorityColorMap[c.priority] || { bg: 'var(--teal-tint)', color: 'var(--teal-dark)' };
+  const priStyle = `display:inline-block;padding:3px 9px;border-radius:100px;font-family:var(--font-mono);font-size:0.72rem;background:${priBadge.bg};color:${priBadge.color};`;
   const statusClass = ['Resolved', 'Closed'].includes(c.status) ? 'resolved' : 'pending';
   return `
     <div class="view-grid">
@@ -847,8 +837,8 @@ function buildViewDetailsMarkup(c) {
         <span class="view-value ticket-no">#${c.ticket_no}</span>
       </div>
       <div class="view-field">
-        <span class="view-label">Category</span>
-        <span class="view-value" style="display:inline-block;padding:4px 10px;border-radius:100px;font-family:var(--font-mono);font-size:0.72rem;background:${catBg};color:${catCol};">${c.category || ''}</span>
+        <span class="view-label">Priority</span>
+        <span class="view-value" style="${priStyle}">${c.priority || 'Low'}</span>
       </div>
       <div class="view-field">
         <span class="view-label">Date</span>
@@ -859,16 +849,8 @@ function buildViewDetailsMarkup(c) {
         <span class="view-value" style="font-family:var(--font-mono);color:var(--ink-soft);">${formatTimeDisplay(c.time)}</span>
       </div>
       <div class="view-field">
-        <span class="view-label">City</span>
+        <span class="view-label">City / Region</span>
         <span class="view-value">${c.city || ''}</span>
-      </div>
-      <div class="view-field">
-        <span class="view-label">State / Region</span>
-        <span class="view-value">${c.state || ''}</span>
-      </div>
-      <div class="view-field">
-        <span class="view-label">Zip Code</span>
-        <span class="view-value" style="font-family:var(--font-mono);">${c.zipcode || ''}</span>
       </div>
       <div class="view-field">
         <span class="view-label">Status</span>
@@ -982,7 +964,7 @@ function wireActivitiesPage() {
 
       ['err-complaint','err-date','err-time','err-city'].forEach(clearFieldError);
 
-      const category = document.getElementById('f-category').value || null;
+      // category is intentionally NOT sent — classified server-side (Decision 34)
       const complaint = document.getElementById('f-complaint').value.trim();
       const date_month_year = document.getElementById('f-date').value;
       const hour12 = document.getElementById('f-hour').value;
@@ -1027,7 +1009,7 @@ function wireActivitiesPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...llAuthHeaders() },
           body: JSON.stringify({
-            complaint, city, state, zipcode, category,
+            complaint, city, state, zipcode,
             incident_date: date_month_year,
             incident_time,
           })
@@ -1076,7 +1058,7 @@ function wireActivitiesPage() {
   })();
 
   buildTimeSelectOptions();
-  populateCategorySelect(document.getElementById('f-category'), { includeAutoDetect: true });
+  // f-category removed from customer form (Decision 34) — no populate needed
   llRefreshComplaintsCache().then(() => {
     renderComplaintTable();
     updateComplaintStats();

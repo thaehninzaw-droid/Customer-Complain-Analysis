@@ -63,7 +63,7 @@ def _seed_admin_on_startup():
     separate manual step. Idempotent against real MongoDB too - see
     app/admin_seed.py."""
     ensure_admin_seeded()
-    # Auto-seed the complaints collection from the Comcast dataset CSV
+    # Auto-seed the complaints collection from the banking dataset CSV
     # on first startup so the admin dashboard shows real analytics
     # immediately, without any separate data-loading step. Only runs
     # against the in-memory DB (no MONGODB_URI) and only when the
@@ -177,23 +177,60 @@ def _to_complaint_out(doc: dict) -> ComplaintOut:
     )
 
 
+def _jaccard_similarity(a: str, b: str) -> float:
+    """Simple Jaccard overlap on word sets after lowercasing.
+    Returns a float in [0, 1]. Used by the same-day repeat rule."""
+    set_a = set(a.lower().split())
+    set_b = set(b.lower().split())
+    if not set_a or not set_b:
+        return 0.0
+    return len(set_a & set_b) / len(set_a | set_b)
+
+
+def _is_repeat_same_day(user_id: int, new_text: str, new_date: str, existing: list) -> bool:
+    """Returns True when the same user already filed a complaint on the
+    same calendar date AND the new text is substantially similar to at
+    least one of those complaints (Jaccard overlap >= 0.7 on word sets,
+    OR the normalised texts are an exact match after collapsing whitespace).
+
+    Decision 34: same-user same-day similar complaint -> force High priority.
+    Implemented server-side so the rule cannot be bypassed via the frontend.
+    """
+    new_norm = " ".join(new_text.lower().split())
+    same_day = [
+        c for c in existing
+        if c.get("user_id") == user_id and c.get("date_month_year") == new_date
+    ]
+    for prev in same_day:
+        prev_text = (prev.get("complaint") or "").strip()
+        prev_norm = " ".join(prev_text.lower().split())
+        if prev_norm == new_norm:
+            return True
+        if _jaccard_similarity(new_text, prev_text) >= 0.7:
+            return True
+    return False
+
+
 @app.post("/complaints", response_model=ComplaintOut)
 def create_complaint(complaint: ComplaintIn, user_id: int = Depends(get_current_user_id)):
     """Customer submits complaint text (+ optional city/state/zip).
     user_id comes from the session token, not from the request body -
     a customer can only ever file a complaint as themselves.
-    ticket_no, date, time, and status are auto-filled. category
-    (Algorithm 1) and priority (Algorithm 2) are auto-predicted UNLESS
-    the client sends one (keeps a manual dropdown/override working
-    too) - see app/classify.py and app/priority.py."""
+    ticket_no, date, time, and status are auto-filled.
+    category (Algorithm 1) and priority (Algorithm 2) are auto-predicted
+    server-side — the customer form no longer sends category.
+
+    Decision 34: same-user same-day repeat rule — if this user already
+    filed a substantially similar complaint today, priority is forced
+    to High regardless of the model score. See _is_repeat_same_day()."""
     try:
         validate_complaint_text(complaint.complaint)
         validate_city(complaint.city)
     except ComplaintValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    category = complaint.category or classify_complaint(complaint.complaint)
-    priority = complaint.priority or predict_priority(complaint.complaint, category)
+    category = classify_complaint(complaint.complaint)
+    priority = predict_priority(complaint.complaint, category)
     now = datetime.now(YANGON_TZ)
 
     # Use the user-supplied incident date/time if provided and not in the future.
@@ -214,6 +251,10 @@ def create_complaint(complaint: ComplaintIn, user_id: int = Depends(get_current_
 
     collection = get_collection("complaints")
     existing = list(collection.find())
+
+    # Same-user same-day repeat override (Decision 34)
+    if _is_repeat_same_day(user_id, complaint.complaint, date_str, existing):
+        priority = "High"
 
     doc = {
         "ticket_no": next_ticket_no([c["ticket_no"] for c in existing]),
@@ -350,7 +391,7 @@ def list_baseline_complaints(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=15, ge=1, le=200),
 ):
-    """Serves the full Comcast dataset (2224 rows) from the CSV file,
+    """Serves the full banking dataset (12,000 rows) from the CSV file,
     with Algorithm 1 and Algorithm 2 applied to every row, paginated
     and filterable with the same interface as GET /admin/complaints.
 

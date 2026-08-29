@@ -1,5 +1,5 @@
 // ==========================================================================
-// Loopline — Admin AI Chatbot page logic
+// Loopline — Admin Chatbot page logic
 // Requires config.js, admin.js loaded first.
 // ==========================================================================
 
@@ -30,7 +30,7 @@ function addChatMessage(text, role, meta) {
     }
     const badge = document.createElement('span');
     badge.className = 'rag-badge';
-    badge.textContent = meta.used_rag ? '● Answered via Gemini + Qdrant (RAG)' : '○ Fallback response (RAG not configured or unavailable)';
+    badge.textContent = meta.used_rag ? '● Answered from SOP knowledge base' : '○ Fallback response (knowledge base unavailable)';
     el.appendChild(badge);
   }
 

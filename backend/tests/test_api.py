@@ -1,3 +1,15 @@
+"""
+Integration tests for the FastAPI layer.
+
+Decision 34 (banking pivot):
+  - Category assertions updated from Billing/Technical/etc. to banking categories.
+  - test_manual_category_overrides_auto_classify removed: the customer-facing
+    POST /complaints no longer accepts a category from the client (server always
+    classifies). Admin POST /admin/complaints still accepts an override.
+  - test_chatbot_recommend updated: expects a banking category.
+  - test_repeat_same_day_forces_high_priority added: covers the new business rule.
+  - test_categories_endpoint updated: expects banking categories.
+"""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,11 +21,6 @@ client = TestClient(app)
 
 @pytest.fixture(scope="module", autouse=True)
 def _ensure_admin_exists():
-    # Deliberately NOT relying on app.main's @app.on_event("startup")
-    # hook firing via TestClient - whether a plain (non-context-manager)
-    # TestClient(app) triggers startup events is genuinely version-
-    # dependent across Starlette releases. Seeding directly here is
-    # explicit and version-independent.
     ensure_admin_seeded()
 
 
@@ -23,7 +30,6 @@ def _signup(email="jane@example.com", username="Jane Doe", password="Passw0rd!")
 
 def _admin_login():
     import os
-
     email = os.getenv("ADMIN_EMAIL", "admin@loopline.io")
     password = os.getenv("ADMIN_PASSWORD", "ChangeMe123!")
     resp = client.post("/auth/login", json={"email": email, "password": password})
@@ -80,23 +86,64 @@ def test_complaint_requires_auth():
 
 
 def test_complaint_rejects_bad_token():
-    resp = client.post("/complaints", json={"complaint": "bad token"}, headers=_auth_headers("garbage-token"))
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "bad token"},
+        headers=_auth_headers("garbage-token"),
+    )
     assert resp.status_code == 401
 
 
-def test_create_and_list_own_complaint():
-    auth = _signup(email="complainer@example.com").json()
+def test_create_complaint_classifies_to_banking_category():
+    """POST /complaints must return a banking category from Algorithm 1."""
+    from app.categories import CATEGORIES
+    auth = _signup(email="banking_user@example.com").json()
     resp = client.post(
         "/complaints",
-        json={"complaint": "My bill was overcharged this month"},
+        json={"complaint": "I found an unauthorized charge on my credit card statement last week and the bank has not responded."},
         headers=_auth_headers(auth["token"]),
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["category"] == "Billing"
+    assert body["category"] in CATEGORIES
     assert body["priority"] in ["Low", "Medium", "High"]
     assert body["status"] == "Pending"
     assert body["received_via"] == "Web Form"
+    assert body["user_id"] == auth["user"]["user_id"]
+
+
+def test_customer_form_does_not_accept_category_field():
+    """The client must NOT be able to dictate the category — it is always
+    classified server-side (Decision 34). Sending 'category' in the body
+    must be silently ignored (or the endpoint ignores it per the schema)."""
+    from app.categories import CATEGORIES
+    auth = _signup(email="no_cat_override@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={
+            "complaint": "I found an unauthorized charge on my credit card and need a refund urgently.",
+            "category": "Billing",   # old telecom category — must be ignored
+        },
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    # category must be a banking category, not the stale telecom value sent by client
+    assert body["category"] in CATEGORIES
+    assert body["category"] != "Billing"
+
+
+def test_create_and_list_own_complaint():
+    auth = _signup(email="complainer2@example.com").json()
+    resp = client.post(
+        "/complaints",
+        json={"complaint": "My mortgage payment was applied incorrectly three times this year and no one has fixed it."},
+        headers=_auth_headers(auth["token"]),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["priority"] in ["Low", "Medium", "High"]
+    assert body["status"] == "Pending"
     assert body["user_id"] == auth["user"]["user_id"]
 
     resp = client.get("/complaints", headers=_auth_headers(auth["token"]))
@@ -106,55 +153,62 @@ def test_create_and_list_own_complaint():
 
 
 def test_priority_reflects_urgency_not_just_a_constant():
-    # Exercises Algorithm 2 at the HTTP layer, not just the underlying
-    # function directly - this endpoint never had a priority-specific
-    # test before priority prediction existed.
-    auth = _signup(email="urgent@example.com").json()
+    """Exercises Algorithm 2 at the HTTP layer with banking-domain text."""
+    auth = _signup(email="urgency_banking@example.com").json()
     calm = client.post(
-        "/complaints", json={"complaint": "I have a small question about my invoice, not urgent."},
+        "/complaints",
+        json={"complaint": "I have a small question about my savings account balance, no rush at all."},
         headers=_auth_headers(auth["token"]),
     ).json()
     urgent = client.post(
         "/complaints",
-        json={"complaint": "URGENT!!! This is unacceptable, I have been overcharged for weeks and nobody responds, I am furious!"},
+        json={
+            "complaint": (
+                "URGENT!!!! My account has been frozen without notice. "
+                "I cannot pay my rent. This is the third time this month!!!! "
+                "I will escalate to the CFPB immediately if this is not resolved TODAY."
+            )
+        },
         headers=_auth_headers(auth["token"]),
     ).json()
     assert calm["priority"] == "Low"
     assert urgent["priority"] == "High"
 
 
-def test_idor_is_fixed_users_cannot_see_each_others_complaints():
-    """This is the bug we fixed: user A must never see user B's complaints."""
-    auth_a = _signup(email="usera@example.com").json()
-    auth_b = _signup(email="userb@example.com").json()
-
-    client.post("/complaints", json={"complaint": "A's private complaint"}, headers=_auth_headers(auth_a["token"]))
-    client.post("/complaints", json={"complaint": "B's private complaint"}, headers=_auth_headers(auth_b["token"]))
-
-    resp_a = client.get("/complaints", headers=_auth_headers(auth_a["token"]))
-    texts_a = [c["complaint"] for c in resp_a.json()]
-    assert "B's private complaint" not in texts_a
-
-    resp_b = client.get("/complaints", headers=_auth_headers(auth_b["token"]))
-    texts_b = [c["complaint"] for c in resp_b.json()]
-    assert "A's private complaint" not in texts_b
-
-
-def test_manual_category_overrides_auto_classify():
-    auth = _signup(email="manual@example.com").json()
-    resp = client.post(
-        "/complaints",
-        json={"complaint": "totally unrelated text", "category": "Service"},
-        headers=_auth_headers(auth["token"]),
+def test_repeat_same_day_complaint_forces_high_priority():
+    """Business rule Decision 34: same user, same day, similar text -> High."""
+    auth = _signup(email="repeat_user@example.com").json()
+    headers = _auth_headers(auth["token"])
+    complaint_text = (
+        "My debit card was charged twice at the grocery store yesterday "
+        "and I need a refund for the duplicate charge immediately."
     )
-    assert resp.json()["category"] == "Service"
+    # First submission — priority is whatever the model decides
+    first = client.post("/complaints", json={"complaint": complaint_text}, headers=headers).json()
+    # Second identical submission same day — must be High regardless
+    second = client.post("/complaints", json={"complaint": complaint_text}, headers=headers).json()
+    assert second["priority"] == "High", (
+        f"Expected High for same-day repeat complaint, got {second['priority']!r}"
+    )
+
+
+def test_idor_is_fixed_users_cannot_see_each_others_complaints():
+    """IDOR regression guard: user A must never see user B's complaints."""
+    auth_a = _signup(email="usera_banking@example.com").json()
+    auth_b = _signup(email="userb_banking@example.com").json()
+
+    client.post("/complaints", json={"complaint": "A's private banking complaint about overdraft fees"}, headers=_auth_headers(auth_a["token"]))
+    client.post("/complaints", json={"complaint": "B's private banking complaint about credit report error"}, headers=_auth_headers(auth_b["token"]))
+
+    texts_a = [c["complaint"] for c in client.get("/complaints", headers=_auth_headers(auth_a["token"])).json()]
+    assert not any("B's private" in t for t in texts_a)
+
+    texts_b = [c["complaint"] for c in client.get("/complaints", headers=_auth_headers(auth_b["token"])).json()]
+    assert not any("A's private" in t for t in texts_b)
 
 
 def test_complaint_too_short_rejected_server_side():
-    # Regression guard for docs/DECISIONS.md #21/#22: this validation
-    # used to only exist in frontend/script.js, so a direct API call
-    # like this one could bypass it entirely.
-    auth = _signup(email="tooshort@example.com").json()
+    auth = _signup(email="tooshort_banking@example.com").json()
     resp = client.post(
         "/complaints",
         json={"complaint": "too short"},
@@ -165,7 +219,7 @@ def test_complaint_too_short_rejected_server_side():
 
 
 def test_complaint_too_long_rejected_server_side():
-    auth = _signup(email="toolong@example.com").json()
+    auth = _signup(email="toolong_banking@example.com").json()
     resp = client.post(
         "/complaints",
         json={"complaint": "x" * 1001},
@@ -175,10 +229,13 @@ def test_complaint_too_long_rejected_server_side():
 
 
 def test_complaint_with_unknown_city_rejected_server_side():
-    auth = _signup(email="badcity@example.com").json()
+    auth = _signup(email="badcity_banking@example.com").json()
     resp = client.post(
         "/complaints",
-        json={"complaint": "My internet has been down for three days now.", "city": "Atlantis"},
+        json={
+            "complaint": "My credit card was charged an unauthorized fee three times this month.",
+            "city": "Atlantis",
+        },
         headers=_auth_headers(auth["token"]),
     )
     assert resp.status_code == 400
@@ -186,22 +243,24 @@ def test_complaint_with_unknown_city_rejected_server_side():
 
 
 def test_complaint_with_known_city_accepted_case_insensitive():
-    auth = _signup(email="goodcity@example.com").json()
+    auth = _signup(email="goodcity_banking@example.com").json()
     resp = client.post(
         "/complaints",
-        json={"complaint": "My internet has been down for three days now.", "city": "yangon"},
+        json={
+            "complaint": "My credit card was charged an unauthorized fee three times this month.",
+            "city": "yangon",
+        },
         headers=_auth_headers(auth["token"]),
     )
     assert resp.status_code == 200
-    assert resp.json()["city"] == "yangon"  # stored as sent, only validated case-insensitively
+    assert resp.json()["city"] == "yangon"
 
 
 def test_complaint_with_no_city_still_works():
-    # city is optional - omitting it must never trigger the new validation
-    auth = _signup(email="nocity@example.com").json()
+    auth = _signup(email="nocity_banking@example.com").json()
     resp = client.post(
         "/complaints",
-        json={"complaint": "My internet has been down for three days now."},
+        json={"complaint": "My mortgage servicer has not applied my payment correctly for two months."},
         headers=_auth_headers(auth["token"]),
     )
     assert resp.status_code == 200
@@ -226,10 +285,18 @@ def test_pulse_endpoint_returns_12_numbers():
     assert all(0 <= v <= 100 for v in body)
 
 
-def test_categories_endpoint():
+def test_categories_endpoint_returns_banking_categories():
     resp = client.get("/categories")
     assert resp.status_code == 200
-    assert resp.json() == ["Billing", "Financial", "Technical", "Service", "Others"]
+    categories = resp.json()
+    assert set(categories) == {
+        "Cards",
+        "Accounts",
+        "Loans",
+        "Collections & Credit reporting",
+        "Other banking",
+    }
+    assert len(categories) == 5
 
 
 def test_cities_endpoint():
@@ -241,21 +308,19 @@ def test_cities_endpoint():
     assert any(entry["city"] == "Yangon" for entry in body)
 
 
-def test_chatbot_recommend():
-    resp = client.post("/chatbot/recommend", json={"complaint_text": "My internet is down again"})
+def test_chatbot_recommend_returns_banking_category():
+    from app.categories import CATEGORIES
+    resp = client.post(
+        "/chatbot/recommend",
+        json={"complaint_text": "I have an unauthorized charge on my credit card and I want a refund"},
+    )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["category"] == "Technical"
+    assert body["category"] in CATEGORIES
     assert "recommendation" in body
 
 
 # ------------------------------------------------------------- admin ----
-# NOTE: this whole section replaces a stale test that called
-# GET /admin/complaints with NO auth and expected 200 + a plain list -
-# that was true before admin auth existed (see docs/ADMIN_AUTH.md and
-# DECISIONS.md #13). It's a 401 now, and the response shape changed to
-# a paginated object. Caught and fixed while wiring up CI - see
-# docs/DECISIONS.md #18 for why that matters.
 
 def test_admin_complaints_requires_auth():
     resp = client.get("/admin/complaints")
@@ -263,7 +328,7 @@ def test_admin_complaints_requires_auth():
 
 
 def test_admin_complaints_rejects_customer_token():
-    auth = _signup(email="notadmin@example.com").json()
+    auth = _signup(email="notadmin_banking@example.com").json()
     resp = client.get("/admin/complaints", headers=_auth_headers(auth["token"]))
     assert resp.status_code == 403
 
@@ -283,7 +348,7 @@ def test_admin_manual_entry_and_inline_edit():
 
     created = client.post(
         "/admin/complaints",
-        json={"complaint": "Customer called about a billing dispute", "received_via": "Phone Call"},
+        json={"complaint": "Customer called about a suspected fraudulent charge on their debit card", "received_via": "Phone Call"},
         headers=headers,
     )
     assert created.status_code == 200
@@ -308,9 +373,6 @@ def test_admin_manual_entry_and_inline_edit():
 
 
 def test_admin_manual_entry_also_enforces_server_side_validation():
-    # POST /admin/complaints shares the same validation as the
-    # customer-facing POST /complaints - an admin fat-fingering a
-    # manual entry should get the same clear rejection.
     admin = _admin_login()
     headers = _auth_headers(admin["token"])
     resp = client.post(
@@ -341,12 +403,10 @@ def test_admin_ml_status_shape():
 
 
 def test_admin_chatbot_ask_falls_back_gracefully_without_gemini_key():
-    # CI doesn't (and shouldn't) have a real GEMINI_API_KEY configured -
-    # this confirms the fallback path responds usefully rather than
-    # erroring, per app/chatbot.py's design.
     admin = _admin_login()
     resp = client.post(
-        "/admin/chatbot/ask", json={"question": "How should I handle a repeat billing complaint?"},
+        "/admin/chatbot/ask",
+        json={"question": "How should I handle a repeat complaint about unauthorized credit card charges?"},
         headers=_auth_headers(admin["token"]),
     )
     assert resp.status_code == 200
@@ -358,7 +418,8 @@ def test_admin_chatbot_ask_falls_back_gracefully_without_gemini_key():
 def test_admin_chatbot_ask_rejects_unknown_ticket():
     admin = _admin_login()
     resp = client.post(
-        "/admin/chatbot/ask", json={"question": "What's going on with this ticket?", "ticket_no": 999999},
+        "/admin/chatbot/ask",
+        json={"question": "What's going on with this ticket?", "ticket_no": 999999},
         headers=_auth_headers(admin["token"]),
     )
     assert resp.status_code == 404

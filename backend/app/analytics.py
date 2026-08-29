@@ -53,7 +53,7 @@ def _month_range(start_ym, end_ym, cap=MAX_MONTHS):
 
 
 def compute_analytics(docs: list) -> dict:
-    by_category = Counter(d.get("category", "Others") for d in docs)
+    by_category = Counter(d.get("category", "Other banking") for d in docs)
     by_status = Counter(d.get("status", "Pending") for d in docs)
     by_priority = Counter(d.get("priority", "Low") for d in docs)
     by_received_via = Counter(d.get("received_via", "Web Form") for d in docs)

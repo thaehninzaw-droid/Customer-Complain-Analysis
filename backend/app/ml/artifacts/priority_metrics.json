@@ -1,50 +1,57 @@
 {
-  "trained_at": "2026-08-16T16:35:08.619253+00:00",
-  "dataset_path": "C:\\Users\\abc\\Customer-Complain-Analysis\\backend\\data\\comcast_complaints.csv",
-  "dataset_is_synthetic": false,
-  "n_rows_total": 2224,
-  "n_train": 1779,
-  "n_test": 445,
-  "accuracy_vs_baseline_labels": 1.0,
+  "trained_at": "2026-08-29T09:44:22.423904+00:00",
+  "dataset_path": "C:\\Users\\abc\\Customer-Complain-Analysis\\backend\\data\\banking_complaints.csv",
+  "dataset_is_banking": true,
+  "n_rows_total": 12000,
+  "n_train": 9600,
+  "n_test": 2400,
+  "accuracy_vs_baseline_labels": 0.9975,
   "classification_report": {
     "High": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 17.0
+      "precision": 0.9990817263544536,
+      "recall": 0.9963369963369964,
+      "f1-score": 0.9977074736359468,
+      "support": 1092.0
     },
     "Low": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 357.0
+      "recall": 0.9985815602836879,
+      "f1-score": 0.9992902767920511,
+      "support": 705.0
     },
     "Medium": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 71.0
+      "precision": 0.9917627677100495,
+      "recall": 0.9983416252072969,
+      "f1-score": 0.9950413223140496,
+      "support": 603.0
     },
-    "accuracy": 1.0,
+    "accuracy": 0.9975,
     "macro avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 445.0
+      "precision": 0.9969481646881677,
+      "recall": 0.9977533939426605,
+      "f1-score": 0.9973463575806826,
+      "support": 2400.0
     },
     "weighted avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 445.0
+      "precision": 0.9975125808784264,
+      "recall": 0.9975,
+      "f1-score": 0.9975025515434258,
+      "support": 2400.0
     }
   },
   "label_distribution": {
-    "Low": 1786,
-    "Medium": 352,
-    "High": 86
+    "Low": 3525,
+    "Medium": 3013,
+    "High": 5462
   },
-  "label_source": "distant supervision from app.priority.predict_priority_baseline (see module docstring / docs/ALGORITHMS.md)",
-  "model": "XGBClassifier(n_estimators=200, max_depth=4)",
-  "features": "sentiment/urgency signals (app.sentiment) + one-hot category + 500-feature TF-IDF (see app/ml/features.py)"
+  "label_source": "distant supervision from app.priority.predict_priority_baseline (CFPB has no official Low/Medium/High column - see docs/ALGORITHMS.md)",
+  "priority_thresholds": {
+    "High": ">= 0.40 (calibrated near 90th percentile of score distribution)",
+    "Medium": ">= 0.20 (calibrated near 60th percentile)",
+    "Low": "< 0.20",
+    "note": "These are calibrated cutoffs, NOT a published standard formula."
+  },
+  "model": "HistGradientBoostingClassifier(max_depth=4) [xgboost not installed - see module docstring]",
+  "features": "polarity, urgency, length, word_count, exclamation_count (app.sentiment) + one-hot category + 500-feature TF-IDF (see app/ml/features.py)",
+  "honesty_note": "accuracy_vs_baseline_labels measures the trained tree against the heuristic-baseline pseudo-labels it was trained on, NOT against human-labeled ground truth. 1.0 = the tree memorized the baseline. See docs/ALGORITHMS.md."
 }

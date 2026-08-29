@@ -55,7 +55,7 @@ def passes_confidence_gate(proba) -> bool:
     depending on how any particular trained model happens to behave on
     any particular string - that behavior legitimately varies by
     training data (e.g. it changed between the synthetic dataset and
-    the real one once "Others" became the largest class - see
+    the real one once "Other banking" became the largest class - see
     docs/ALGORITHMS.md), which makes it a poor thing to hang a test on
     directly."""
     return bool(proba.max() >= MIN_CONFIDENCE)

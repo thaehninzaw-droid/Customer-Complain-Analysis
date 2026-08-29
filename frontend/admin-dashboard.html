@@ -66,13 +66,13 @@
       <span class="ds-toggle-label">Chart data</span>
       <div class="ds-toggle-group">
         <button class="ds-toggle-btn active" id="btn-baseline" onclick="switchDataSource('baseline')">
-          📊 Comcast Baseline <span class="ds-count">(2,224)</span>
+          📊 CFPB Banking Dataset <span class="ds-count">(12,000)</span>
         </button>
         <button class="ds-toggle-btn" id="btn-live" onclick="switchDataSource('live')">
           🔴 Live Data
         </button>
       </div>
-      <span class="ds-source-pill baseline" id="ds-source-pill">Comcast Baseline · 2,224 complaints</span>
+      <span class="ds-source-pill baseline" id="ds-source-pill">CFPB Banking · 12,000 complaints</span>
       <span style="font-size:0.75rem;color:var(--ink-faint);font-family:var(--font-mono);">
         ↑ affects charts and the complaints table below
       </span>
@@ -124,7 +124,7 @@
     <section class="card table-card">
       <div class="table-head">
         <div>
-          <h3>All Complaints <span style="font-size:0.72rem;font-weight:400;font-family:var(--font-mono);color:var(--ink-faint);margin-left:6px;" id="table-source-label">comcast dataset · read-only</span></h3>
+          <h3>All Complaints <span style="font-size:0.72rem;font-weight:400;font-family:var(--font-mono);color:var(--ink-faint);margin-left:6px;" id="table-source-label">banking dataset · read-only</span></h3>
           <p style="margin:4px 0 0; font-size:0.88rem;">Filter, search, edit status/category/priority inline, or add one manually.</p>
         </div>
         <button class="btn btn-primary" id="btn-new-complaint-admin">

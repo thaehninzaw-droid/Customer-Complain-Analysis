@@ -281,13 +281,9 @@
               <thead>
                 <tr>
                   <th>Ticket #</th>
-                  <th>Category</th>
                   <th>Complaint</th>
                   <th>Date</th>
-                  <th>Time</th>
-                  <th>City</th>
-                  <th>State</th>
-                  <th>Zip Code</th>
+                  <th>Priority</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -328,23 +324,10 @@
           <p class="form-note" style="margin:6px 0 0;">Auto-generated — read only</p>
         </div>
 
-        <div class="field">
-          <label for="f-category">Category <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
-          <select id="f-category">
-            <option value="">Auto-detect for me</option>
-            <option value="Billing">Billing</option>
-            <option value="Financial">Financial</option>
-            <option value="Technical">Technical</option>
-            <option value="Service">Service</option>
-            <option value="Others">Others</option>
-          </select>
-          <p class="form-note" style="margin:6px 0 0;">Leave on "Auto-detect" and our AI will categorize it for you.</p>
-        </div>
-
         <div class="field grid-full">
-          <label for="f-complaint">Customer Complaint</label>
-          <textarea id="f-complaint" rows="4" placeholder="Describe your complaint in detail (minimum 20 characters)..." required></textarea>
-          <div class="field-hint" id="hint-complaint">20–1000 characters · At least 3 words</div>
+          <label for="f-complaint">Complaint Description</label>
+          <textarea id="f-complaint" rows="5" placeholder="Please describe your banking complaint in detail. Include what happened, when it occurred, and what you have already tried (minimum 20 characters)..." required></textarea>
+          <div class="field-hint" id="hint-complaint">20–2000 characters · At least 3 words</div>
           <p class="field-error" id="err-complaint"></p>
         </div>
 

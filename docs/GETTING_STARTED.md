@@ -1,184 +1,198 @@
 # Getting started (for anyone new to Loopline)
 
-This doc assumes nothing - not that you've used FastAPI before, not
-that you know what a virtual environment is, not that you've touched
-this codebase at all. If you already know your way around a Python
-backend, `backend/README.md` is the faster reference version of most
-of this. If you get stuck on anything below and the fix isn't obvious,
-that's a gap in this doc, not a dumb question - ask, and whoever
-answers should add it to the Troubleshooting section for the next
-person.
+This doc assumes nothing — not that you have used FastAPI before, not
+that you know what a virtual environment is, not that you have touched
+this codebase. If you get stuck and the fix is not obvious, that is a
+gap in this doc — ask, and the answer should be added to the
+Troubleshooting section for the next person.
 
-## What this project actually does, in plain language
+## What this project actually does
 
-A customer types a complaint into a web page ("my bill is wrong",
-"internet keeps dropping"). The backend automatically figures out
-*what kind* of complaint it is (Billing, Technical, etc.) and *how
-urgent* it is (Low/Medium/High), using two small machine learning
-models trained on a real dataset of ~2,200 Comcast complaints. The
-customer can track their complaint's status. An admin has a dashboard
-to see everything, filter/search it, edit it by hand, see analytics,
-and ask an AI chatbot questions grounded in the team's support
-procedures. That's the whole product - everything below is just "how
-do I get that running on my laptop and start changing it."
+A customer types a banking complaint into a web page ("my credit card
+was charged twice", "my account has been frozen without notice"). The
+backend automatically figures out *what kind* of complaint it is
+(Cards, Accounts, Loans, Collections & Credit reporting, or Other
+banking) using Algorithm 1, and *how urgent* it is (Low / Medium /
+High) using Algorithm 2. The customer sees their complaint's status
+and priority — but never the category (category is admin-only).
+
+A business rule (Decision 34) applies on top of the model: if the
+same user files a substantially similar complaint twice in the same
+calendar day, priority is forced to High.
+
+An admin has a dashboard to see everything, filter/search, edit
+complaints by hand, view analytics, and ask a chatbot questions
+grounded in five banking SOP documents (Cards, Accounts, Loans,
+Collections, Other banking). The chatbot is not trained on complaint
+data — it reads the SOP files only.
 
 ---
 
 ## Step 1: What you need installed
 
-| Tool | Why | Check you have it |
+| Tool | Why | Check |
 |---|---|---|
-| **Python 3.11 or 3.12** | Runs the backend | `python3 --version` (Windows: `python --version`) |
-| **git** | Version control - see `docs/GIT_SETUP.md` for the team workflow | `git --version` |
-| **A code editor** | VS Code is the common choice, but any editor works | - |
-| **A web browser** | Runs the frontend - Chrome/Firefox/Edge, any modern one | - |
+| **Python 3.11 or 3.12** | Runs the backend | `python3 --version` |
+| **git** | Version control | `git --version` |
+| **A code editor** | VS Code is the common choice | — |
+| **A modern browser** | Runs the frontend | — |
 
-You do **not** need Node.js, Docker, MongoDB, or any API keys to get a
-fully working version of this running - see Step 5.
+You do **not** need Node.js, Docker, MongoDB, or any API keys to get
+a fully working version running locally — see Step 5.
 
-**Don't have Python installed?**
-- **Windows**: download from [python.org/downloads](https://www.python.org/downloads/) and run the
-  installer. Important: tick **"Add python.exe to PATH"** on the first
-  install screen, or the `python` command won't work afterward.
-- **Mac**: download from the same link, or if you use
-  [Homebrew](https://brew.sh): `brew install python@3.12`
-- **Linux**: almost always already installed; if not,
-  `sudo apt install python3 python3-venv` (Ubuntu/Debian) or your
-  distro's equivalent.
-
-After installing, close and reopen your terminal, then re-run
-`python3 --version` (or `python --version` on Windows) to confirm it
-worked - you should see something like `Python 3.12.4`.
-
-**A note on terminal commands in this doc:** every code block below is
-something you type into a terminal (Mac/Linux: Terminal app; Windows:
-PowerShell, or the terminal built into VS Code - View → Terminal). One
-line at a time, press Enter after each.
+**Don't have Python?**
+- Windows: download from [python.org/downloads](https://www.python.org/downloads/), tick **"Add python.exe to PATH"** on the first screen.
+- Mac: `brew install python@3.12` or download from python.org.
+- Linux: `sudo apt install python3 python3-venv`
 
 ---
 
 ## Step 2: Get the code
 
-**If your team is using shared Git already** (see `docs/GIT_SETUP.md`):
+**From a zip file** (most likely for this project):
+```bash
+unzip Loopline_Banking_v*.zip -d loopline
+cd loopline/Customer-Complain-Analysis-main
+```
+
+**From git:**
 ```bash
 git clone https://github.com/<your-team>/loopline.git
 cd loopline
 ```
 
-**If you were handed a `.zip` file instead:** unzip it anywhere sensible
-(e.g. your Desktop or a `projects` folder), then open a terminal and
-`cd` into the folder it created:
-```bash
-cd path/to/loopline
-```
-Tip: on Mac/Windows you can usually type `cd ` (with a trailing space)
-into the terminal, then drag the folder from Finder/Explorer into the
-terminal window - it fills in the path for you.
-
-**Confirm you're in the right place** - this should show `backend`,
-`frontend`, and `docs` folders:
+Confirm you are in the right place — you should see `backend`,
+`frontend`, and `docs`:
 ```bash
 ls
 ```
-(Windows PowerShell: `dir` works the same way.)
 
 ---
 
-## Step 3: Set up the backend (Python environment)
+## Step 3: Set up the backend
 
-Move into the backend folder - **everything in this step happens from
-inside `backend/`**, not the top-level `loopline/` folder:
+Everything in this step runs from inside `backend/`:
 ```bash
 cd backend
 ```
 
 ### 3a. Create a virtual environment
-
-A virtual environment ("venv") is a private, isolated copy of Python
-just for this project, so the packages it needs don't clash with any
-other Python project on your machine. Create one:
 ```bash
 python3 -m venv venv
 ```
-(Windows: `python -m venv venv`. Either way this creates a new `venv/`
-folder - it's already excluded from Git via `.gitignore`, don't worry
-about committing it.)
+(Windows: `python -m venv venv`)
 
-### 3b. Activate it
+### 3b. Activate it — every time you open a new terminal
 
-You have to do this **every time you open a new terminal** to work on
-this project (it doesn't stay active across terminal sessions):
+- Mac/Linux: `source venv/bin/activate`
+- Windows PowerShell: `venv\Scripts\Activate.ps1`
+- Windows Command Prompt: `venv\Scripts\activate.bat`
 
-- **Mac/Linux**: `source venv/bin/activate`
-- **Windows (PowerShell)**: `venv\Scripts\Activate.ps1`
-- **Windows (Command Prompt)**: `venv\Scripts\activate.bat`
+Your prompt should now start with `(venv)`. If it does not, the venv
+is not active and `import fastapi` will fail.
 
-You'll know it worked because your terminal prompt now starts with
-`(venv)`, like:
-```
-(venv) you@laptop backend %
-```
-If nothing changed, it didn't activate - re-read the command for your
-OS above (this trips people up constantly, it's not just you).
-
-**Windows PowerShell "running scripts is disabled" error?** Run this
-once, then retry the activate command:
+**Windows "running scripts is disabled" error?**
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-### 3c. Install the dependencies
-
-With `(venv)` showing in your prompt:
+### 3c. Install dependencies
 ```bash
 pip install -r requirements-dev.txt
 ```
-This downloads and installs everything the backend needs (FastAPI,
-the ML libraries, the test framework, etc.) - takes a minute or two.
-You'll see a lot of text scroll by; that's normal. It worked if the
-last line looks like `Successfully installed ...` with no red error
-text above it.
-
-**Common failure: no internet access, or a corporate/school network
-blocking PyPI.** If `pip install` hangs or fails with a connection
-error, you need internet access to `pypi.org` specifically - try a
-different network (phone hotspot is a good test) before assuming
-something's broken.
+Takes a minute or two. Works if the last line says
+`Successfully installed ...` with no red error above it.
 
 ---
 
-## Step 4: Set up your `.env` file (optional, but do it anyway)
+## Step 4: Set up your `.env` file
 
-Copy the example file:
 ```bash
 cp .env.example .env
 ```
-(Windows Command Prompt: `copy .env.example .env`)
+(Windows: `copy .env.example .env`)
 
-Open `.env` in your editor. **You can leave every value as-is for
-local development** - the app runs with zero configuration, using an
-in-memory database and a rule-based/template fallback for anything
-that would otherwise need MongoDB, Gemini, or Qdrant credentials. The
-comments in `.env.example` explain what each variable is for and
-where to get a real value later if you need one. `.env` itself is
-already in `.gitignore` - **never commit it** once it has anything
-real in it (see `docs/GIT_SETUP.md`).
+**You can leave every value as-is for local development.** The app
+runs with no configuration, using an in-memory database and fallback
+rule-based logic for anything that would need MongoDB, Gemini, or
+Qdrant credentials. See `.env.example` comments for what each
+variable controls.
+
+`.env` is already in `.gitignore` — never commit it once it has real
+credentials.
 
 ---
 
-## Step 5: Train the ML models (optional, but do it once)
+## Step 5: Prepare the banking dataset and train the models
+
+**This step is required before the app will have real data or real
+ML predictions.** Without it the app starts but the database is empty
+and classification uses keyword fallbacks only.
+
+### 5a. Download the raw dataset (one-time)
+
+Download the CFPB Consumer Complaints CSV from Kaggle:
+```
+https://www.kaggle.com/datasets/sebastienverpile/consumercomplaintsdata
+```
+Place the downloaded file at:
+```
+backend/data/raw/consumer_complaints.csv
+```
+(The `raw/` folder already exists. The file is ~400 MB. Do not commit
+it to git — it is in `.gitignore`.)
+
+### 5b. Run the cleaning script
+
+```bash
+python -m data.clean_banking_dataset
+```
+
+This reads the raw file, applies the full cleaning pipeline documented
+in `backend/data/EDA.md`, and writes:
+```
+backend/data/banking_complaints.csv   ← 12,000 clean banking complaints
+```
+The raw file is never modified. Output is deterministic (seed 42).
+
+Full EDA report: `backend/data/EDA.md`.
+
+### 5c. Train Algorithm 1 (category classifier)
 
 ```bash
 python -m app.ml.train_classifier
+```
+
+Trains TF-IDF + Logistic Regression on the 5 banking categories
+using the official CFPB-mapped labels in `banking_complaints.csv`.
+Prints accuracy when done (expect ~86% on banking data).
+
+Writes to `backend/app/ml/artifacts/`:
+- `category_model.joblib`
+- `category_vectorizer.joblib`
+- `category_metrics.json`
+
+### 5d. Train Algorithm 2 (priority predictor)
+
+```bash
 python -m app.ml.train_priority
 ```
-Each command trains one of the two algorithms against the real dataset
-already included at `backend/data/comcast_complaints.csv`, and prints
-its accuracy when done. This takes a few seconds. **You can skip this
-entirely** - the app falls back to simpler rule-based logic
-automatically if no trained model exists - but running it once gives
-you the real, more-accurate ML models instead. See `docs/ALGORITHMS.md`
-if you're curious how either one actually works.
+
+Trains XGBoost (or HistGradientBoostingClassifier if xgboost is not
+installed) over sentiment/urgency features. Labels are generated by
+the rule-based baseline (distant supervision — CFPB has no priority
+column). Prints the label distribution and accuracy.
+
+Writes to `backend/app/ml/artifacts/`:
+- `priority_model.joblib`
+- `priority_vectorizer.joblib`
+- `priority_label_encoder.joblib`
+- `priority_metrics.json`
+
+**Can I skip this?** Yes — the app falls back to keyword-based
+classification and rule-based priority automatically if no model
+artifacts exist. But the trained models are noticeably better and
+only take a few seconds each to train.
 
 ---
 
@@ -188,66 +202,66 @@ Still inside `backend/`, with `(venv)` active:
 ```bash
 uvicorn app.main:app --reload
 ```
-You should see something like:
+
+You should see:
 ```
-[loopline] Seeded demo admin account -> email: admin@loopline.io | password: ChangeMe123! ...
-INFO:     Application startup complete.
+[loopline] Seeded demo admin → email: admin@loopline.io | password: ChangeMe123!
+[dataset_seed] Seeding complaints from banking_complaints.csv ...
+[dataset_seed] Seeded 12000 banking complaints — dashboard analytics are now populated.
 INFO:     Uvicorn running on http://127.0.0.1:8000
 ```
-That admin email/password line is your login for the admin dashboard -
-it's seeded automatically every time the server starts (see
-`app/admin_seed.py`).
 
-**Confirm it's really working**: open
-[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your
-browser. You should see an interactive API documentation page (Swagger
-UI) listing every endpoint - you can even try them out directly from
-that page. If the page doesn't load, the server isn't running or
-something failed on startup - scroll up in the terminal for the actual
-error.
+The admin credentials are seeded automatically every time — no
+manual setup. The complaint seeding runs once (skipped if the
+collection already has data).
 
-`--reload` means the server automatically restarts whenever you save a
-change to a backend file - leave this terminal window open and running
-while you work.
+**Confirm it works:** open
+[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) — you should
+see the interactive Swagger UI listing every endpoint.
 
-**"Address already in use" error?** Something's already using port
-8000 - either a previous `uvicorn` you forgot to stop (find and close
-that terminal), or another program. Run on a different port instead:
-`uvicorn app.main:app --reload --port 8001` (and update `API_BASE` in
-`frontend/config.js` to match).
+`--reload` means the server auto-restarts on file changes. Leave this
+terminal open while you work.
+
+**"Address already in use"?** Something is already on port 8000.
+Run on a different port:
+```bash
+uvicorn app.main:app --reload --port 8001
+```
+Then update `API_BASE` in `frontend/config.js` to match.
 
 ---
 
 ## Step 7: Run the frontend
 
-The frontend is plain HTML/CSS/JavaScript - no build step, no `npm
-install`. With the backend still running in its own terminal, just
-open `frontend/index.html` directly in your browser (double-click it,
-or drag it into an open browser window).
-
-`frontend/config.js` already knows to point at `http://127.0.0.1:8000`
-when you're running locally (opening the file directly counts as
-local, whether that's `file://` or `localhost` - see the comment in
-that file). You don't need to run a separate local web server for the
-frontend, though `python -m http.server` from inside `frontend/` works
-too if you prefer an actual `http://localhost` URL over `file://`.
+The frontend is plain HTML/CSS/JavaScript — no build step, no
+`npm install`. With the backend running, open `frontend/index.html`
+in your browser (double-click it, or drag it into an open browser
+window).
 
 **Try it out:**
-1. Click "Sign Up", create a customer account (password needs 8+
-   characters, one uppercase letter, and one of `! @ # $ % ^ & *`).
-2. File a complaint. Watch it get auto-categorized.
-3. Log out, go to `admin-login.html`, log in with the admin
-   email/password printed in the backend terminal in Step 6.
-4. Poke around the admin dashboard - filter, search, edit a complaint,
-   check the analytics tab, try the AI chatbot (it'll give template
-   answers unless you've set `GEMINI_API_KEY` - see
-   `docs/RAG_CHATBOT.md`).
+1. Click "Sign Up" — create a customer account. Password needs 8+
+   characters, one uppercase letter, and one of `! @ # $ % ^ & *`
+   (e.g. `Passw0rd!`).
+2. File a banking complaint — describe a realistic banking problem in
+   at least 20 characters. The form only collects:
+   - Complaint text
+   - Date and time
+   - City / region
+   There is no category field — category is detected automatically
+   server-side by Algorithm 1.
+3. Your complaint history shows Ticket #, Complaint text, Date,
+   Priority (Low / Medium / High), and Status. Category is not shown
+   to the customer.
+4. Log out → open `admin-login.html` → log in with the admin
+   email/password from the backend terminal.
+5. Admin dashboard shows all 5 banking categories, priority
+   distribution, monthly volume, and an analytics tab. The chatbot
+   tab shows "Chatbot" and answers questions about banking SOP
+   procedures.
 
-**Nothing happens when you click things / browser console shows
-errors?** Open your browser's developer tools (F12, or right-click →
-Inspect → Console tab) and see the actual error - it'll almost always
-say either "failed to fetch" (backend isn't running, or you're on the
-wrong port) or a specific validation message from the backend.
+**Nothing happens / browser console errors?** Open DevTools (F12 →
+Console). "Failed to fetch" means the backend is not running or is on
+the wrong port.
 
 ---
 
@@ -256,239 +270,116 @@ wrong port) or a specific validation message from the backend.
 ```bash
 pytest
 ```
-This runs the full automated test suite against the code as it
-stands - it takes a few seconds and should end with something like
-`103 passed` (the exact number grows over time as more gets added;
-what matters is `passed`, not `failed` or `error`). This is the
-fastest way to check "did my change break anything" before you commit.
 
-There's also a slower, more real-world check:
+All 164 tests should pass. Tests cover both algorithms, the same-day
+repeat-priority rule, banking category names, SOP file set, BM25
+index, API endpoints, and the admin dashboard. The exact count may
+grow as more tests are added — what matters is `0 failed`.
+
+To run a specific file:
 ```bash
-# terminal 1 (leave running)
-uvicorn app.main:app --reload
-
-# terminal 2
-python scripts/manual_api_smoke_check.py
+pytest tests/test_classify.py -v
+pytest tests/test_priority.py -v
+pytest tests/test_api.py -v
 ```
-This one starts a real server and hits it with real HTTP requests
-(signup, login, file a complaint, admin actions, etc.) - closer to
-what actually clicking through the browser does, useful after touching
-anything auth- or routing-related. See `docs/TESTING.md` for the full
-picture of what's been verified and how.
 
 ---
 
 ## Step 9: Find your way around the codebase
 
-You don't need to read every file to get started - use this table to
-jump straight to whatever you're actually trying to change:
-
-| "I want to change/add..." | Look here |
+| "I want to change..." | Look here |
 |---|---|
-| What happens when a complaint is filed | `backend/app/main.py` (`POST /complaints`) |
-| The category-classification logic (Algorithm 1) | `backend/app/classify.py`, `backend/app/ml/train_classifier.py` |
-| The priority-prediction logic (Algorithm 2) | `backend/app/priority.py`, `backend/app/ml/train_priority.py` |
-| Signup/login rules (password strength, etc.) | `backend/app/auth.py` |
-| What a request/response looks like (fields, types) | `backend/app/models.py` |
-| The list of valid categories | `backend/app/categories.py` |
-| The list of valid Myanmar cities (autofills state/zip) | `backend/app/cities.py` |
-| Server-side complaint length / city checks | `backend/app/validation.py` |
-| Anything admin-only | search `backend/app/main.py` for `/admin/` |
-| The AI chatbot | `backend/app/chatbot.py`, `backend/app/rag/` |
-| The RAG knowledge base (SOP docs the chatbot searches) | `backend/data/knowledge_base/` — drop `.md`, `.txt`, or `.pdf` files here, then re-run `python -m app.rag.knowledge_base` |
-| How the database connection works (or its fallback) | `backend/app/db.py` |
-| A customer-facing page's look/behavior | `frontend/*.html` + matching `.js` file (e.g. `activities.html` ↔ `script.js`) |
-| An admin page's look/behavior | `frontend/admin-*.html` + `admin*.js` |
+| What happens when a complaint is filed | `backend/app/main.py` → `POST /complaints` |
+| Same-day repeat → High priority rule | `backend/app/main.py` → `_is_repeat_same_day()` |
+| Category classification (Algorithm 1) | `backend/app/classify.py`, `backend/app/ml/train_classifier.py` |
+| Priority prediction (Algorithm 2) | `backend/app/priority.py`, `backend/app/ml/train_priority.py` |
+| Sentiment / urgency scoring | `backend/app/sentiment.py` |
+| The 5 banking categories | `backend/app/categories.py` |
+| Chatbot recommendation text | `backend/app/chatbot.py` → `RECOMMENDATIONS` dict |
+| Banking SOP documents (chatbot knowledge base) | `backend/data/knowledge_base/*.md` |
+| Rebuild BM25 index after editing SOPs | `python -m app.rag.knowledge_base` |
+| Dataset cleaning pipeline | `backend/data/clean_banking_dataset.py` |
+| EDA report | `backend/data/EDA.md` |
+| Myanmar cities (autofills state/zip in the form) | `backend/app/cities.py` |
+| Server-side validation (text length, city check) | `backend/app/validation.py` |
+| Customer-facing complaint form | `frontend/activities.html` + `frontend/script.js` |
+| Admin dashboard | `frontend/admin-dashboard.html` + `frontend/admin-dashboard.js` |
+| Admin chatbot page | `frontend/admin-chatbot.html` + `frontend/admin-chatbot.js` |
 | Shared styling | `frontend/style.css` |
-| Where the frontend points its API calls | `frontend/config.js` |
-| What data trains the ML models | `backend/data/comcast_complaints.csv` (real Kaggle data, 2224 rows, 2025 dates) |
-| What data the RAG chatbot searches | `backend/data/knowledge_base/` — SOP `.md`/`.pdf` files, NOT the training CSV |
-
-For the bigger picture (why things are structured this way, not just
-where they live), see `docs/ARCHITECTURE.md`. For the full list of
-every endpoint and its exact request/response shape, see
-`docs/API_REFERENCE.md`.
+| API base URL for frontend | `frontend/config.js` |
+| Database connection / in-memory fallback | `backend/app/db.py` |
 
 ---
 
-## Step 10: A worked example - make a real change, safely
+## Step 10: Enable the AI chatbot (optional — needs API keys)
 
-This walks through the entire loop once: change code → see it take
-effect → write a test for it → run the tests → (when you're ready)
-commit it. We'll add a `version` field to the health-check endpoint -
-small, harmless, and it touches both a backend file and a test file so
-you see the whole pattern.
+Without API keys the chatbot gives rule-based template answers and
+says so in the UI — fully usable. With keys it gives real answers
+grounded in the banking SOP documents.
 
-**1. Make the change.** Open `backend/app/main.py`, find:
-```python
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
+**1. Get keys:**
+- `GEMINI_API_KEY` → [aistudio.google.com](https://aistudio.google.com)
+- `QDRANT_URL` + `QDRANT_API_KEY` → [cloud.qdrant.io](https://cloud.qdrant.io) (free tier works), or run locally: `docker run -p 6333:6333 qdrant/qdrant`
+
+**2. Add to `backend/.env`:**
 ```
-and change it to:
-```python
-@app.get("/")
-def health_check():
-    return {"status": "ok", "version": "1.0.0"}
-```
-Save the file. If `uvicorn --reload` is still running from Step 6, it
-auto-restarts - check its terminal for `Application startup complete.`
-again.
-
-**2. Confirm it worked.** With the server running:
-```bash
-curl http://127.0.0.1:8000/
-```
-Expect: `{"status":"ok","version":"1.0.0"}`. (No `curl`? Just open
-`http://127.0.0.1:8000/` in a browser tab instead - same result.)
-
-**3. Write a test for it.** Open `backend/tests/test_api.py`, find:
-```python
-def test_health_check():
-    resp = client.get("/")
-    assert resp.status_code == 200
-```
-and add a line:
-```python
-def test_health_check():
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert resp.json()["version"] == "1.0.0"
-```
-
-**4. Run the tests.**
-```bash
-pytest tests/test_api.py -k health_check -v
-```
-Expect: `1 passed`. Then run the whole suite once more to make sure
-nothing else broke: `pytest` → expect `103 passed` (this doc doesn't
-add a *new* test, it edits an existing one, so the total count doesn't
-change).
-
-**5. Undo it (since this was just practice), or commit it for real.**
-To undo: change both files back to what they were above, save, and
-confirm `pytest` still passes. To keep it: follow the commit/branch/PR
-steps in `docs/GIT_SETUP.md`.
-
-That's the whole loop you'll repeat for every real change: edit → run
-the server or `curl`/browser to eyeball it → write or update a test →
-`pytest` → commit.
-
----
-
-## Step 11: Enable the AI chatbot (optional — needs real API keys)
-
-The admin chatbot works in two modes:
-- **Without API keys** (default): gives rule-based template answers and
-  says so honestly in the UI — fully usable, no setup needed.
-- **With API keys**: Gemini generates real answers grounded in the SOP
-  documents in `data/knowledge_base/` via Qdrant vector search (RAG).
-
-To enable the real chatbot:
-
-**1. Get your API keys** (one-time):
-- `GEMINI_API_KEY` → [aistudio.google.com](https://aistudio.google.com) → Get API key
-- `QDRANT_URL` + `QDRANT_API_KEY` → [cloud.qdrant.io](https://cloud.qdrant.io) (free tier available) or run Qdrant locally: `docker run -p 6333:6333 qdrant/qdrant`
-
-**2. Add them to `backend/.env`:**
-```
-GEMINI_API_KEY=your_gemini_key_here
+GEMINI_API_KEY=your_key_here
 QDRANT_URL=https://your-cluster.qdrant.io
 QDRANT_API_KEY=your_qdrant_key_here
 ```
 
-**3. Index the knowledge base** (run once, and any time SOP docs change):
+**3. Index the banking SOPs** (once, and any time SOP docs change):
 ```bash
 cd backend
 python -m app.rag.knowledge_base
 ```
-This reads every `.md`/`.pdf` file in `data/knowledge_base/`, embeds
-each chunk via Gemini, and stores them in Qdrant. You'll see:
-```
-[knowledge_base] Indexed 47 chunks from 5 documents (Qdrant).
-```
+Expect: `5 document(s) → 39 chunks`, then `BM25 index saved`.
 
-**4. Restart the server** — the chatbot will now use real Gemini answers.
+**4. Restart the server** — chatbot now uses real Gemini answers.
 
-**Important:** Step 3 (`python -m app.rag.knowledge_base`) must be run
-from inside the `backend/` folder with the `venv` active — it needs
-`GEMINI_API_KEY` from your `.env` file and it needs to reach
-`generativelanguage.googleapis.com`. Run it again any time you add or
-edit files in `data/knowledge_base/`.
-
-**If the chatbot shows "Knowledge base not indexed yet":** you have
-Qdrant connected but haven't run Step 3 yet — run it and the error
-goes away.
+The BM25 index is built automatically even without API keys. Only the
+Gemini answer-generation step needs `GEMINI_API_KEY`. See
+`docs/RAG_CHATBOT.md` for the full setup.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Likely cause / fix |
+| Symptom | Fix |
 |---|---|
-| `command not found: python` | Try `python3` instead (Mac/Linux almost always use `python3`), or Python isn't on your `PATH` - see Step 1. |
-| `ModuleNotFoundError: No module named 'fastapi'` (or similar) | Your venv isn't activated - re-run the Step 3b command for your OS, confirm `(venv)` shows in your prompt, then re-run whatever command failed. |
-| `pip install` fails with a connection/timeout error | No internet access to `pypi.org` - see Step 3c. |
-| Signup rejects your password | Needs 8+ characters, at least one uppercase letter, and one of `! @ # $ % ^ & *` (e.g. `Passw0rd!` works, `password123` doesn't) - see `backend/app/auth.py`. |
-| Signup rejects your name | Must start with a letter, 3-20 characters, letters/numbers/spaces only - no underscores, no punctuation. |
-| Filing a complaint (via `curl`/Postman, not the UI) gets `400` | Complaint text must be 20-1000 characters, and `city` (if you send one at all) must be a real entry from `GET /cities` - see `app/validation.py`. The UI already enforces both before it ever sends the request, so this mostly shows up when testing the API directly. |
-| `Address already in use` when starting `uvicorn` | Something's already on port 8000 - see Step 6. |
-| Frontend shows "failed to fetch" / spinner never resolves | Backend isn't running, or is running on a different port than `frontend/config.js` expects - check the backend terminal, and check `API_BASE` in `config.js`. |
-| `Invalid or expired session token` | You're logged out (or the backend restarted, which clears in-memory sessions) - log in again. |
-| Admin pages show "Admin access required" (403) | You're logged in as a customer account, not the admin account - log in with the admin email/password printed on backend startup instead. |
-| Chatbot gives a generic templated answer, not something specific | Expected with no `GEMINI_API_KEY` set - see `docs/RAG_CHATBOT.md` to enable the real thing. |
-| `pytest` fails after you added a new file to `backend/scripts/` or similar | If its filename matches `test_*.py` or `*_test.py`, pytest tries to collect it as a test automatically - see `docs/DECISIONS.md` #20 for exactly this happening. Rename it to something else, e.g. `*_check.py`. |
-| Git says you have "uncommitted changes" you don't remember making | Probably `venv/` or `__pycache__/` folders - both should already be in `.gitignore`; if `git status` still shows them, something's off with your `.gitignore` setup, ask a teammate. |
-
-If you hit something not listed here, once you figure it out, add it
-to this table for the next person - that's exactly how this table got
-built in the first place.
+| `command not found: python` | Try `python3`; or Python is not on your PATH — see Step 1 |
+| `ModuleNotFoundError: No module named 'fastapi'` | Venv is not activated — re-run the Step 3b command, confirm `(venv)` in your prompt |
+| `pip install` hangs / connection error | No internet access to `pypi.org` — try a phone hotspot |
+| `banking_complaints.csv` not found on startup | Run Step 5b (`python -m data.clean_banking_dataset`) first |
+| Startup shows "Seeded 0 banking complaints" | Check that `banking_complaints.csv` exists in `backend/data/` |
+| Password rejected at signup | Needs 8+ chars, one uppercase, one of `! @ # $ % ^ & *` |
+| Complaint rejected (400) from API directly | Must be 20–1000 characters; city (if sent) must be in `GET /cities` |
+| Frontend shows "Failed to fetch" | Backend is not running, or on a different port than `API_BASE` in `config.js` |
+| "Invalid or expired session token" | Logged out or backend restarted (in-memory sessions reset) — log in again |
+| "Admin access required" (403) | Logged in as customer — use the admin email/password from the backend terminal |
+| Chatbot gives template answers | Expected without `GEMINI_API_KEY` — see Step 10 |
+| `pytest` fails on `test_bm25_index_covers_banking_keywords` | Run `python -m app.rag.knowledge_base` to rebuild the BM25 index |
+| ML model predicts wrong category | Retrain: `python -m app.ml.train_classifier` — check `category_metrics.json` |
+| "Address already in use" on port 8000 | Add `--port 8001` to uvicorn and update `config.js` |
 
 ---
 
 ## A short glossary
 
-Terms that come up across the docs and might not be obvious yet:
-
-- **Ticket / `ticket_no`**: the unique number assigned to each filed
-  complaint (starts at 100001), used to look it up later.
-- **Session token**: an opaque string returned on login, sent back as
-  `Authorization: Bearer <token>` on every request that needs to know
-  who you are - not your password, and not something meaningful on its
-  own (see `docs/ARCHITECTURE.md`).
-- **IDOR** (Insecure Direct Object Reference): a security bug class
-  where an ID in a request (like `user_id`) is trusted from the client
-  instead of verified server-side, letting someone access another
-  user's data by just changing a number. Loopline avoids this by
-  deriving `user_id` from the session token, never the request body -
-  see `docs/DECISIONS.md` #9.
-- **RAG** (Retrieval-Augmented Generation): instead of just asking an
-  LLM a question, first search a knowledge base for relevant snippets
-  and hand those to the LLM as context - so answers are grounded in
-  actual documents instead of the model just guessing. That's what
-  powers the Admin AI Chatbot - see `docs/RAG_CHATBOT.md`.
-- **Weak/distant supervision**: training an ML model on labels that
-  were themselves generated by a simpler rule-based system (rather
-  than hand-labeled by a person) - how both Algorithm 1 and Algorithm
-  2's training data was built here. See `docs/ALGORITHMS.md`.
-- **TF-IDF**: a way of turning text into numbers a model can use, based
-  on how often a word appears in a given document vs. how common it is
-  across all documents - what Algorithm 1's category classifier uses
-  to represent complaint text.
-- **In-memory fallback**: when a real service (MongoDB, Qdrant) isn't
-  configured, the app substitutes a simple in-Python-memory version of
-  the same interface instead of failing - see `docs/ARCHITECTURE.md`'s
-  "why this shape" section. Convenient for development; data doesn't
-  survive a server restart.
+- **`ticket_no`** — unique number per complaint (starts at 100001)
+- **Session token** — opaque string returned on login, sent as `Authorization: Bearer <token>`; `user_id` is derived from this server-side, never trusted from the client body
+- **IDOR** — Insecure Direct Object Reference; prevented here by deriving `user_id` from the session token, not the request body (see DECISIONS.md #9)
+- **RAG** — Retrieval-Augmented Generation; search a knowledge base first, then pass the matching snippets to an LLM as context — used by the chatbot (see `docs/RAG_CHATBOT.md`)
+- **Distant supervision** — generating training labels from a rule-based heuristic instead of hand-labeling; used for Algorithm 2 priority labels (CFPB has no priority column)
+- **TF-IDF** — turns text into a vector of word-importance scores; used by Algorithm 1 to represent complaint text for Logistic Regression
+- **In-memory fallback** — when MongoDB is not configured, the app uses a Python dict in place of the real database; data resets on server restart
 
 ---
 
-## Where to go from here
+## Where to go next
 
-Once the above all works and makes sense, the root `README.md` has a
-full documentation map - `docs/ARCHITECTURE.md` for the bigger
-picture, `docs/ALGORITHMS.md` for how the ML actually works,
-`docs/API_REFERENCE.md` for every endpoint, and `docs/DECISIONS.md` for
-the reasoning behind basically every non-obvious choice in this
-codebase (genuinely worth skimming - a lot of "why is it done this
-way, not that way" gets answered there before you need to ask).
+- `docs/ALGORITHMS.md` — how both ML algorithms actually work, with real accuracy numbers and documented bugs
+- `docs/DECISIONS.md` — every non-obvious architectural choice, including Decision 34 (the full banking pivot)
+- `docs/API_REFERENCE.md` — every endpoint's exact request/response shape
+- `docs/ARCHITECTURE.md` — the big-picture system design
+- `backend/data/EDA.md` — full dataset EDA report
